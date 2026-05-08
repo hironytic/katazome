@@ -57,7 +57,7 @@ export function tokenize(text: string, tagDef: ExtensionTagDefinition): Token[] 
     if (bestPos === -1 || bestCandidate === undefined) {
       // No more tags found; the rest is literal text.
       const remaining = text.slice(pos);
-      checkForbiddenInLiteral(remaining, pos);
+      checkForbiddenInLiteral(text, pos, remaining);
       if (remaining.length > 0) {
         tokens.push({ kind: "literal", text: remaining });
       }
@@ -66,7 +66,7 @@ export function tokenize(text: string, tagDef: ExtensionTagDefinition): Token[] 
 
     // Emit the literal text before the tag.
     const literalText = text.slice(pos, bestPos);
-    checkForbiddenInLiteral(literalText, pos);
+    checkForbiddenInLiteral(text, pos, literalText);
     if (literalText.length > 0) {
       tokens.push({ kind: "literal", text: literalText });
     }
@@ -75,8 +75,9 @@ export function tokenize(text: string, tagDef: ExtensionTagDefinition): Token[] 
     const startLen = bestCandidate.def.start.length;
     const endStart = text.indexOf(bestCandidate.def.end, bestPos + startLen);
     if (endStart === -1) {
+      const { line, col } = positionToLineCol(text, bestPos);
       throw new KatazomeError(
-        `Unclosed ${bestCandidate.kind} tag: "${bestCandidate.def.start}" at position ${bestPos} has no matching "${bestCandidate.def.end}".`
+        `Unclosed ${bestCandidate.kind} tag: "${bestCandidate.def.start}" at line ${line}, column ${col} has no matching "${bestCandidate.def.end}".`
       );
     }
 
@@ -97,12 +98,25 @@ export function tokenize(text: string, tagDef: ExtensionTagDefinition): Token[] 
   return tokens;
 }
 
-function checkForbiddenInLiteral(text: string, _offset: number): void {
+function checkForbiddenInLiteral(fullText: string, sliceStart: number, slice: string): void {
   for (const forbidden of FORBIDDEN_IN_LITERAL) {
-    if (text.includes(forbidden)) {
+    const idx = slice.indexOf(forbidden);
+    if (idx !== -1) {
+      const { line, col } = positionToLineCol(fullText, sliceStart + idx);
       throw new KatazomeError(
-        `Literal text must not contain "${forbidden}". It collides with Katazome's internal comment markings.`
+        `Literal text must not contain "${forbidden}" (line ${line}, column ${col}). It collides with Katazome's internal comment markings.`
       );
     }
   }
+}
+
+/**
+ * Converts a character offset within `text` to a 1-based line and column number.
+ */
+function positionToLineCol(text: string, pos: number): { line: number; col: number } {
+  const before = text.slice(0, pos);
+  const lines = before.split("\n");
+  const line = lines.length;
+  const col = (lines[lines.length - 1]?.length ?? 0) + 1;
+  return { line, col };
 }
