@@ -29,8 +29,11 @@ const ktzm = {
   out(s: string): void {
     chunks.push(s);
   },
-  get input(): unknown {
-    return inputData;
+  // Input data is typed as any so that templates can access properties
+  // freely (e.g. ktzm.input.foobar) without TypeScript errors.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  get input(): any {
+    return inputData as any;
   },
 };
 
