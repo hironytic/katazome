@@ -1,0 +1,22 @@
+{
+  "name": "katazome",
+  "version": "0.1.0",
+  "description": "A CLI tool for generating source files from TypeScript templates",
+  "type": "module",
+  "bin": {
+    "ktzm": "./src/cli.ts"
+  },
+  "scripts": {
+    "start": "bun run src/cli.ts",
+    "build": "bun build src/cli.ts --compile --outfile dist/ktzm",
+    "test": "mkdir -p .ktzm/tmp && TMPDIR=$PWD/.ktzm/tmp bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "commander": "^12.1.0",
+    "json5": "^2.2.3"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  }
+}

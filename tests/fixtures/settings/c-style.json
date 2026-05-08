@@ -1,0 +1,29 @@
+{
+  "tagDefinition": {
+    "c": {
+      "code": [
+        { "start": "/*{%", "end": "%}*/" },
+        { "start": "/*{%-", "end": "-%}*/", "trim": "both" }
+      ],
+      "value": [
+        { "start": "_V_", "end": "_" },
+        { "start": "_V(\"", "end": "\")" }
+      ],
+      "comment": [
+        { "start": "/*{#", "end": "#}*/" }
+      ]
+    },
+    "ts": {
+      "code": [
+        { "start": "/*{%", "end": "%}*/" },
+        { "start": "/*{%-", "end": "-%}*/", "trim": "both" }
+      ],
+      "value": [
+        { "start": "_V_", "end": "_" }
+      ],
+      "comment": [
+        { "start": "/*{#", "end": "#}*/" }
+      ]
+    }
+  }
+}

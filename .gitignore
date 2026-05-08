@@ -63,4 +63,6 @@ dist/
 .idea/
 *.local.md
 .claude/worktrees/
+*.bun-build
+.ktzm/
 
