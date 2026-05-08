@@ -2,18 +2,17 @@ import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
-import { runtimeContent } from "../runtime/content.ts";
+import { generateRuntimeContent } from "../runtime/content.ts";
 import { KatazomeError } from "../errors.ts";
 
 /**
  * Renders a transpilate by running it with Bun as a subprocess.
  *
- * The transpilate imports the runtime file. The runtime reads input from
- * KTZM_INPUT_FILE and writes output to KTZM_OUTPUT_FILE, both passed as
- * environment variables.
+ * Input data is embedded directly into the runtime file as a JSON literal.
+ * The runtime writes its output to KTZM_OUTPUT_FILE (passed as an env var).
  *
  * @param transpilateContent  The TypeScript transpilate source code.
- * @param inputData           Parsed input data (will be serialized to JSON).
+ * @param inputData           Parsed input data (embedded into the runtime).
  * @param outputFilePath      Absolute path where the rendered output should be written.
  */
 export async function render(
@@ -27,11 +26,9 @@ export async function render(
   try {
     const runtimePath = join(tmpDir, "ktzm-runtime.ts");
     const transpilatePath = join(tmpDir, "transpilate.ts");
-    const inputPath = join(tmpDir, "input.json");
 
-    writeFileSync(runtimePath, runtimeContent, "utf-8");
+    writeFileSync(runtimePath, generateRuntimeContent(inputData), "utf-8");
     writeFileSync(transpilatePath, transpilateContent, "utf-8");
-    writeFileSync(inputPath, JSON.stringify(inputData), "utf-8");
     // Pre-create the output file so it always exists after render, even if
     // the template produces no output (the runtime will overwrite it).
     writeFileSync(outputFilePath, "", "utf-8");
@@ -39,7 +36,6 @@ export async function render(
     const proc = Bun.spawn(["bun", "run", transpilatePath], {
       env: {
         ...process.env,
-        KTZM_INPUT_FILE: inputPath,
         KTZM_OUTPUT_FILE: outputFilePath,
       },
       stdout: "inherit",

@@ -1,9 +1,10 @@
 import { resolve, dirname, join, basename } from "node:path";
 import { writeFileSync, statSync, existsSync } from "node:fs";
 import { loadSetting } from "../config/loader.ts";
+import { loadInput } from "../input/loader.ts";
 import { tokenize } from "../core/tokenizer.ts";
 import { transpileTokens } from "../core/transpiler.ts";
-import { runtimeContent } from "../runtime/content.ts";
+import { generateRuntimeContent } from "../runtime/content.ts";
 import { walkDirectory } from "../fs/walker.ts";
 import {
   assertNotSamePath,
@@ -27,6 +28,7 @@ export interface TranspileOptions {
  */
 export async function runTranspile(options: TranspileOptions): Promise<void> {
   const setting = await loadSetting(options.setting);
+  const inputData = options.input !== undefined ? await loadInput(options.input) : {};
 
   const templateAbs = resolve(options.templatePath);
   const isDirectory = existsSync(templateAbs) && statSync(templateAbs).isDirectory();
@@ -46,7 +48,7 @@ export async function runTranspile(options: TranspileOptions): Promise<void> {
       : join(outputAbs, "ktzm-runtime.ts");
 
     ensureDir(runtimePath);
-    writeFileSync(runtimePath, runtimeContent, "utf-8");
+    writeFileSync(runtimePath, generateRuntimeContent(inputData), "utf-8");
 
     const files = walkDirectory(templateAbs);
     for (const file of files) {
@@ -69,13 +71,13 @@ export async function runTranspile(options: TranspileOptions): Promise<void> {
 
     assertNotSamePath(templateAbs, outputAbs);
 
-    // Determine runtime path: --runtime or same dir as transpilate
+    // Determine runtime path: --runtime or same dir as transpiled file
     const runtimePath = options.runtime
       ? resolve(options.runtime)
       : join(dirname(outputAbs), "ktzm-runtime.ts");
 
     ensureDir(runtimePath);
-    writeFileSync(runtimePath, runtimeContent, "utf-8");
+    writeFileSync(runtimePath, generateRuntimeContent(inputData), "utf-8");
 
     await transpileFile(
       templateAbs,

@@ -38,7 +38,7 @@ program
   .command("transpile")
   .description("Convert a template file to a transpiled file (TypeScript)")
   .requiredOption("--setting <file>", "Path to the setting file (JSON or JSON5)")
-  .option("--input <file>", "Path to the input data file (JSON or JSON5; unused but accepted for consistency)")
+  .option("--input <file>", "Path to the input data file (JSON or JSON5)")
   .option("--runtime <file>", "Output path for the runtime file (default: ktzm-runtime.ts next to the transpiled file)")
   .argument("<template-file>", "Template file or directory")
   .argument("[output-transpiled-file]", "Output transpiled file or directory (default: <template-file>.ts)")
