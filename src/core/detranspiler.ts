@@ -53,7 +53,7 @@ export function detranspile(text: string, tagDef: ExtensionTagDefinition): strin
 
     // Unexpected content.
     const snippet = text.slice(pos, pos + 40).replace(/\n/g, "\\n");
-    throw new KatazomeError(`Unexpected content in transpilate at position ${pos}: "${snippet}"`);
+    throw new KatazomeError(`Unexpected content in transpiled file at position ${pos}: "${snippet}"`);
   }
 
   return parts.join("");

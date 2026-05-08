@@ -41,7 +41,7 @@ export async function runDetranspile(options: DetranspileOptions): Promise<void>
       if (!file.relativePath.endsWith(".ts")) {
         throw new KatazomeError(
           `File "${file.relativePath}" in input directory does not end with ".ts". ` +
-          `Only .ts files (transpilates) are expected.`
+          `Only .ts files (transpiled files) are expected.`
         );
       }
       const outRelPath = file.relativePath.slice(0, -3); // remove ".ts"
@@ -89,7 +89,7 @@ async function detranspileFile(
   const ext = getExtension(nameWithoutTs);
   if (ext === undefined) {
     throw new KatazomeError(
-      `Cannot determine original extension from transpilate name "${displayName}".`
+      `Cannot determine original extension from transpiled file name "${displayName}".`
     );
   }
 
@@ -99,7 +99,7 @@ async function detranspileFile(
   try {
     transpilateContent = await Bun.file(transpilatePath).text();
   } catch {
-    throw new KatazomeError(`Cannot read transpilate file: "${transpilatePath}"`);
+    throw new KatazomeError(`Cannot read transpiled file: "${transpilatePath}"`);
   }
 
   const template = detranspile(transpilateContent, tagDef);

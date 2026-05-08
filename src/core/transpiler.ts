@@ -146,7 +146,7 @@ function trimTrailing(text: string): { trimmed: string; remaining: string } {
 function validateTrimmedString(trimmed: string): void {
   if (trimmed.includes("*/")) {
     throw new KatazomeError(
-      `Trimmed whitespace contains "*/" which would break the transpilate comment syntax. This should not happen with normal whitespace/newline content.`
+      `Trimmed whitespace contains "*/" which would break the transpiled file's internal comment syntax. This should not happen with normal whitespace/newline content.`
     );
   }
 }

@@ -36,12 +36,12 @@ program
 // ---------------------------------------------------------------------------
 program
   .command("transpile")
-  .description("Convert a template file to a transpilate (TypeScript) file")
+  .description("Convert a template file to a transpiled file (TypeScript)")
   .requiredOption("--setting <file>", "Path to the setting file (JSON or JSON5)")
   .option("--input <file>", "Path to the input data file (JSON or JSON5; unused but accepted for consistency)")
-  .option("--runtime <file>", "Output path for the runtime file (default: ktzm-runtime.ts next to the transpilate)")
+  .option("--runtime <file>", "Output path for the runtime file (default: ktzm-runtime.ts next to the transpiled file)")
   .argument("<template-file>", "Template file or directory")
-  .argument("[output-transpilate-file]", "Output transpilate file or directory (default: <template-file>.ts)")
+  .argument("[output-transpiled-file]", "Output transpiled file or directory (default: <template-file>.ts)")
   .action(async (
     templateFile: string,
     outputFile: string | undefined,
@@ -61,10 +61,10 @@ program
 // ---------------------------------------------------------------------------
 program
   .command("detranspile")
-  .description("Convert a transpilate file back to the original template")
+  .description("Convert a transpiled file back to the original template")
   .requiredOption("--setting <file>", "Path to the setting file (JSON or JSON5)")
-  .argument("<transpilate-file>", "Transpilate file or directory")
-  .argument("[output-template-file]", "Output template file or directory (default: <transpilate-file> without .ts)")
+  .argument("<transpiled-file>", "Transpiled file or directory")
+  .argument("[output-template-file]", "Output template file or directory (default: <transpiled-file> without .ts)")
   .action(async (
     transpilateFile: string,
     outputFile: string | undefined,
