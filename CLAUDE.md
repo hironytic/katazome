@@ -35,14 +35,9 @@
 
 ### Tests
 
-Always run tests via the package.json script, not `bun test` directly:
-
 ```bash
-bun run test   # correct: sets TMPDIR=$PWD/.ktzm/tmp before running
-bun test       # wrong: temp files go to system TMPDIR (may be outside sandbox)
+bun test
 ```
-
-The `test` script sets `TMPDIR` to `.ktzm/tmp/` inside the project so all temporary files created during tests stay within the project directory. The `.ktzm/` directory is gitignored.
 
 ### Type-checking
 
