@@ -1,16 +1,36 @@
 {
-  "name": "katazome",
+  "name": "@hironytic/katazome",
   "version": "0.1.0",
-  "description": "A CLI tool for generating source files from TypeScript templates",
+  "description": "A CLI tool for generating source files from templates",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hironytic/katazome.git"
+  },
   "type": "module",
   "bin": {
     "ktzm": "./src/cli.ts"
   },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "src/"
+  ],
   "scripts": {
     "start": "bun run src/cli.ts",
     "build": "bun build src/cli.ts --compile --outfile dist/ktzm",
     "test": "bun test",
     "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "bun": ">=1.3.13"
+  },
+  "devEngines": {
+    "runtime": {
+      "name": "bun",
+      "version": "1.3.13"
+    }
   },
   "dependencies": {
     "commander": "^12.1.0",
