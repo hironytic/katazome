@@ -1,4 +1,4 @@
-import type { ExtensionTagDefinition, LiteralToken, TagKind, TagToken, TagTypeDefinition, Token, TrimMode } from "../types.ts";
+import type { ExtensionTagDefinition, TagKind, TagToken, TagTypeDefinition, Token, TrimMode } from "../types.ts";
 import { KatazomeError } from "../errors.ts";
 
 /** Strings that must not appear in literal text (they would collide with comment markings). */

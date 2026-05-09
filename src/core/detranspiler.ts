@@ -198,10 +198,6 @@ function matchTagMarking(
 
   const def = defs[tagIndex];
 
-  const contentStart = indexEnd + "{*/".length; // skip ){*/  → actually "){*/"
-  // Wait, the marker is  /*ktzm:code(N){*/  so after the N we have ){*/
-  // Let's re-check: indexEnd points to the ) in "){*/"
-  // So contentStart = indexEnd + "){*/".length  = indexEnd + 4
   const realContentStart = indexEnd + 4; // skip ){*/
 
   const closeMarker = "/*}ktzm*/";
@@ -210,7 +206,7 @@ function matchTagMarking(
     throw new KatazomeError(`Unterminated ${kind} marking at position ${pos}`);
   }
 
-  let rawContent = text.slice(realContentStart, closePos);
+  const rawContent = text.slice(realContentStart, closePos);
 
   let output: string;
 

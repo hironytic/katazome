@@ -1,4 +1,4 @@
-import type { LiteralToken, TagToken, Token, TrimMode } from "../types.ts";
+import type { TagToken, Token } from "../types.ts";
 import { KatazomeError } from "../errors.ts";
 
 /**

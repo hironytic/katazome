@@ -21,6 +21,7 @@
     "start": "bun run src/cli.ts",
     "build": "bun build src/cli.ts --compile --outfile dist/ktzm",
     "test": "bun test",
+    "lint": "eslint src",
     "typecheck": "tsc --noEmit"
   },
   "engines": {
@@ -38,6 +39,9 @@
     "json5": "^2.2.3"
   },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@eslint/js": "^10.0.1",
+    "@types/bun": "latest",
+    "eslint": "^10.3.0",
+    "typescript-eslint": "^8.59.2"
   }
 }
