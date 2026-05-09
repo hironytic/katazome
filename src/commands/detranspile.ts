@@ -8,11 +8,12 @@ import {
   getTagDefForExtension,
   getExtension,
   ensureDir,
+  resolveSettingPath,
 } from "./utils.ts";
 import { KatazomeError } from "../errors.ts";
 
 export interface DetranspileOptions {
-  setting: string;
+  setting?: string;
   transpilatePath: string;
   outputPath?: string;
 }
@@ -21,7 +22,8 @@ export interface DetranspileOptions {
  * Runs the `detranspile` command: converts transpilate file(s) back to template(s).
  */
 export async function runDetranspile(options: DetranspileOptions): Promise<void> {
-  const setting = await loadSetting(options.setting);
+  const settingPath = resolveSettingPath(options.setting, options.transpilatePath);
+  const setting = await loadSetting(settingPath);
 
   const inputAbs = resolve(options.transpilatePath);
   const isDirectory = existsSync(inputAbs) && statSync(inputAbs).isDirectory();

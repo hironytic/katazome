@@ -12,11 +12,12 @@ import {
   getExtension,
   ensureDir,
   computeRuntimeImportPath,
+  resolveSettingPath,
 } from "./utils.ts";
 import { KatazomeError } from "../errors.ts";
 
 export interface TranspileOptions {
-  setting: string;
+  setting?: string;
   input?: string;
   runtime?: string;
   templatePath: string;
@@ -27,7 +28,8 @@ export interface TranspileOptions {
  * Runs the `transpile` command: converts a template file (or directory) to transpilate(s).
  */
 export async function runTranspile(options: TranspileOptions): Promise<void> {
-  const setting = await loadSetting(options.setting);
+  const settingPath = resolveSettingPath(options.setting, options.templatePath);
+  const setting = await loadSetting(settingPath);
   const inputData = options.input !== undefined ? await loadInput(options.input) : {};
 
   const templateAbs = resolve(options.templatePath);

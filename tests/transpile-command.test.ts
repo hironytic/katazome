@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { runTranspile } from "../src/commands/transpile.ts";
+import { KatazomeError } from "../src/errors.ts";
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -21,6 +22,30 @@ function withTempDir(fn: (dir: string) => Promise<void>): Promise<void> {
   mkdirSync(dir, { recursive: true });
   return fn(dir).finally(() => rmSync(dir, { recursive: true, force: true }));
 }
+
+describe("runTranspile without --setting", () => {
+  test("auto-detects ktzm-setting.json next to template when --setting is omitted", async () => {
+    await withTempDir(async (dir) => {
+      const templatePath = join(dir, "template.txt");
+
+      writeFileSync(join(dir, "ktzm-setting.json"), settingJson, "utf-8");
+      writeFileSync(templatePath, "hello world\n", "utf-8");
+
+      await runTranspile({ templatePath });
+
+      expect(existsSync(join(dir, "template.txt.ts"))).toBe(true);
+    });
+  });
+
+  test("throws KatazomeError when no setting file is found", async () => {
+    await withTempDir(async (dir) => {
+      const templatePath = join(dir, "template.txt");
+      writeFileSync(templatePath, "hello\n", "utf-8");
+
+      await expect(runTranspile({ templatePath })).rejects.toThrow(KatazomeError);
+    });
+  });
+});
 
 describe("runTranspile without --input", () => {
   test("generates transpilate and runtime files with no input", async () => {
