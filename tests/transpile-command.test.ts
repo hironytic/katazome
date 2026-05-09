@@ -47,6 +47,52 @@ describe("runTranspile without --setting", () => {
   });
 });
 
+describe("runTranspile setting file handling", () => {
+  test("copies setting file as-is when input is a directory", async () => {
+    await withTempDir(async (dir) => {
+      const inputDir = join(dir, "src");
+      const outputDir = join(dir, "out");
+      mkdirSync(inputDir, { recursive: true });
+
+      writeFileSync(join(inputDir, "ktzm-setting.json"), settingJson, "utf-8");
+      writeFileSync(join(inputDir, "hello.txt"), "hello\n", "utf-8");
+
+      await runTranspile({ templatePath: inputDir, outputPath: outputDir });
+
+      // Setting file is copied without .ts extension
+      expect(existsSync(join(outputDir, "ktzm-setting.json"))).toBe(true);
+      expect(await Bun.file(join(outputDir, "ktzm-setting.json")).text()).toBe(settingJson);
+      // Template is transpiled with .ts extension
+      expect(existsSync(join(outputDir, "hello.txt.ts"))).toBe(true);
+    });
+  });
+
+  test("throws when single template file is the setting file", async () => {
+    await withTempDir(async (dir) => {
+      const settingPath = join(dir, "ktzm-setting.json");
+      writeFileSync(settingPath, settingJson, "utf-8");
+
+      await expect(
+        runTranspile({ setting: settingPath, templatePath: settingPath })
+      ).rejects.toThrow(KatazomeError);
+    });
+  });
+
+  test("throws when output path is the setting file", async () => {
+    await withTempDir(async (dir) => {
+      const settingPath = join(dir, "ktzm-setting.json");
+      const templatePath = join(dir, "template.txt");
+
+      writeFileSync(settingPath, settingJson, "utf-8");
+      writeFileSync(templatePath, "hello\n", "utf-8");
+
+      await expect(
+        runTranspile({ setting: settingPath, templatePath, outputPath: settingPath })
+      ).rejects.toThrow(KatazomeError);
+    });
+  });
+});
+
 describe("runTranspile without --input", () => {
   test("generates transpilate and runtime files with no input", async () => {
     await withTempDir(async (dir) => {

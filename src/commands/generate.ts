@@ -31,6 +31,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
   const inputData = options.input !== undefined ? await loadInput(options.input) : {};
 
   const templateAbs = resolve(options.templatePath);
+  const settingAbs = resolve(settingPath);
   const outputAbs = resolve(options.outputPath);
   const isDirectory = existsSync(templateAbs) && statSync(templateAbs).isDirectory();
 
@@ -39,7 +40,13 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
   if (isDirectory) {
     const files = walkDirectory(templateAbs);
     for (const file of files) {
+      if (file.absolutePath === settingAbs) continue;
       const outAbsPath = join(outputAbs, file.relativePath);
+      if (outAbsPath === settingAbs) {
+        throw new KatazomeError(
+          `Output path conflicts with the setting file: "${outAbsPath}"`
+        );
+      }
       assertNotSamePath(file.absolutePath, outAbsPath);
       await generateFile(
         file.absolutePath,
@@ -50,6 +57,16 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
       );
     }
   } else {
+    if (templateAbs === settingAbs) {
+      throw new KatazomeError(
+        `The template file is the same as the setting file: "${templateAbs}"`
+      );
+    }
+    if (outputAbs === settingAbs) {
+      throw new KatazomeError(
+        `Output path conflicts with the setting file: "${outputAbs}"`
+      );
+    }
     await generateFile(
       templateAbs,
       outputAbs,

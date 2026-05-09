@@ -1,5 +1,5 @@
 import { resolve, dirname, join, basename } from "node:path";
-import { writeFileSync, statSync, existsSync } from "node:fs";
+import { writeFileSync, statSync, existsSync, copyFileSync } from "node:fs";
 import { loadSetting } from "../config/loader.ts";
 import { loadInput } from "../input/loader.ts";
 import { tokenize } from "../core/tokenizer.ts";
@@ -33,6 +33,7 @@ export async function runTranspile(options: TranspileOptions): Promise<void> {
   const inputData = options.input !== undefined ? await loadInput(options.input) : {};
 
   const templateAbs = resolve(options.templatePath);
+  const settingAbs = resolve(settingPath);
   const isDirectory = existsSync(templateAbs) && statSync(templateAbs).isDirectory();
 
   if (isDirectory) {
@@ -54,8 +55,25 @@ export async function runTranspile(options: TranspileOptions): Promise<void> {
 
     const files = walkDirectory(templateAbs);
     for (const file of files) {
+      if (file.absolutePath === settingAbs) {
+        // Copy the setting file as-is so that detranspile can find it later.
+        const copyDestPath = join(outputAbs, file.relativePath);
+        if (copyDestPath === settingAbs) {
+          throw new KatazomeError(
+            `Output path conflicts with the setting file: "${copyDestPath}"`
+          );
+        }
+        ensureDir(copyDestPath);
+        copyFileSync(file.absolutePath, copyDestPath);
+        continue;
+      }
       const outRelPath = `${file.relativePath}.ts`;
       const outAbsPath = join(outputAbs, outRelPath);
+      if (outAbsPath === settingAbs) {
+        throw new KatazomeError(
+          `Output path conflicts with the setting file: "${outAbsPath}"`
+        );
+      }
       assertNotSamePath(file.absolutePath, outAbsPath);
       await transpileFile(
         file.absolutePath,
@@ -71,6 +89,16 @@ export async function runTranspile(options: TranspileOptions): Promise<void> {
       ? resolve(options.outputPath)
       : `${templateAbs}.ts`;
 
+    if (templateAbs === settingAbs) {
+      throw new KatazomeError(
+        `The template file is the same as the setting file: "${templateAbs}"`
+      );
+    }
+    if (outputAbs === settingAbs) {
+      throw new KatazomeError(
+        `Output path conflicts with the setting file: "${outputAbs}"`
+      );
+    }
     assertNotSamePath(templateAbs, outputAbs);
 
     // Determine runtime path: --runtime or same dir as transpiled file

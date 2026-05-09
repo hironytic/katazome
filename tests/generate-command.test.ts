@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { runGenerate } from "../src/commands/generate.ts";
 import { KatazomeError } from "../src/errors.ts";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
@@ -62,6 +62,51 @@ describe("runGenerate without --setting", () => {
       writeFileSync(templatePath, "hello\n", "utf-8");
 
       await expect(runGenerate({ templatePath, outputPath })).rejects.toThrow(KatazomeError);
+    });
+  });
+});
+
+describe("runGenerate setting file handling", () => {
+  test("skips setting file when input is a directory", async () => {
+    await withTempDir(async (dir) => {
+      const inputDir = join(dir, "src");
+      const outputDir = join(dir, "out");
+      mkdirSync(inputDir, { recursive: true });
+
+      writeFileSync(join(inputDir, "ktzm-setting.json"), settingJson, "utf-8");
+      writeFileSync(join(inputDir, "hello.txt"), "hello\n", "utf-8");
+
+      await runGenerate({ templatePath: inputDir, outputPath: outputDir });
+
+      expect(existsSync(join(outputDir, "hello.txt"))).toBe(true);
+      expect(existsSync(join(outputDir, "ktzm-setting.json"))).toBe(false);
+    });
+  });
+
+  test("throws when single template file is the setting file", async () => {
+    await withTempDir(async (dir) => {
+      const settingPath = join(dir, "ktzm-setting.json");
+      const outputPath = join(dir, "output.txt");
+
+      writeFileSync(settingPath, settingJson, "utf-8");
+
+      await expect(
+        runGenerate({ setting: settingPath, templatePath: settingPath, outputPath })
+      ).rejects.toThrow(KatazomeError);
+    });
+  });
+
+  test("throws when output path is the setting file", async () => {
+    await withTempDir(async (dir) => {
+      const settingPath = join(dir, "ktzm-setting.json");
+      const templatePath = join(dir, "template.txt");
+
+      writeFileSync(settingPath, settingJson, "utf-8");
+      writeFileSync(templatePath, "hello\n", "utf-8");
+
+      await expect(
+        runGenerate({ setting: settingPath, templatePath, outputPath: settingPath })
+      ).rejects.toThrow(KatazomeError);
     });
   });
 });
