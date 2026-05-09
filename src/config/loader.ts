@@ -66,11 +66,28 @@ function validateExtensionTagDefinition(
 
   const obj = value as Record<string, unknown>;
 
-  return {
+  const result: ExtensionTagDefinition = {
     code: validateTagTypeDefinitions(obj["code"], ext, "code", filePath),
     value: validateTagTypeDefinitions(obj["value"], ext, "value", filePath),
     comment: validateTagTypeDefinitions(obj["comment"], ext, "comment", filePath),
   };
+
+  // Detect duplicate start strings within the same extension (across all tag kinds).
+  const seenStarts = new Map<string, string>();
+  for (const kind of ["code", "value", "comment"] as const) {
+    for (const [i, def] of result[kind].entries()) {
+      const location = `tagDefinition["${ext}"].${kind}[${i}].start`;
+      const firstLocation = seenStarts.get(def.start);
+      if (firstLocation !== undefined) {
+        throw new KatazomeError(
+          `Setting file "${filePath}": duplicate start string "${def.start}" at ${location} (already defined at ${firstLocation}).`
+        );
+      }
+      seenStarts.set(def.start, location);
+    }
+  }
+
+  return result;
 }
 
 function validateTagTypeDefinitions(

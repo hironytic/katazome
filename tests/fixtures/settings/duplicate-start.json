@@ -1,0 +1,16 @@
+{
+  "tagDefinition": {
+    "c": {
+      "code": [
+        { "start": "/*{%", "end": "%}*/" },
+        { "start": "/*{%", "end": "-%}*/", "trim": "both" }
+      ],
+      "value": [
+        { "start": "_V_", "end": "_" }
+      ],
+      "comment": [
+        { "start": "/*{#", "end": "#}*/" }
+      ]
+    }
+  }
+}

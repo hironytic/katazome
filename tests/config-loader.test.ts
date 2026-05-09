@@ -29,4 +29,17 @@ describe("loadSetting", () => {
   test("throws on non-existent file", async () => {
     await expect(loadSetting("/non/existent/path.json")).rejects.toThrow(KatazomeError);
   });
+
+  test("throws on duplicate start strings within the same kind", async () => {
+    await expect(loadSetting(`${fixturesDir}duplicate-start.json`)).rejects.toThrow(KatazomeError);
+  });
+
+  test("throws on duplicate start strings across different kinds", async () => {
+    await expect(loadSetting(`${fixturesDir}duplicate-start-cross-kind.json`)).rejects.toThrow(KatazomeError);
+  });
+
+  test("allows identical start strings in different extensions", async () => {
+    // c-style.json defines the same start strings for both "c" and "ts" extensions — this is valid.
+    await expect(loadSetting(`${fixturesDir}c-style.json`)).resolves.toBeDefined();
+  });
 });
