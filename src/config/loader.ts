@@ -1,5 +1,11 @@
 import JSON5 from "json5";
-import type { ExtensionTagDefinition, Setting, TagTypeDefinition } from "../types.ts";
+import type {
+  ExtensionConfig,
+  ExtensionTagDefinitionConfig,
+  Setting,
+  TagDefinition,
+  TagTypeDefinition,
+} from "../types.ts";
 import { KatazomeError } from "../errors.ts";
 
 /**
@@ -39,80 +45,118 @@ function validateSetting(value: unknown, filePath: string): Setting {
 
   const obj = value as Record<string, unknown>;
 
-  if (!("tagDefinition" in obj) || typeof obj["tagDefinition"] !== "object" || obj["tagDefinition"] === null) {
-    throw new KatazomeError(`Setting file "${filePath}" must have a "tagDefinition" object.`);
+  warnUnknownKeys(obj, ["tagDefinition", "extensions"], filePath, "");
+
+  const tagDefinition = validateCommonTagDefinition(obj["tagDefinition"], filePath);
+  const extensions = validateExtensionsMap(obj["extensions"], filePath);
+
+  // Duplicate start string check for each extension's resolved definition.
+  for (const [ext, extConfig] of Object.entries(extensions)) {
+    const extTagDef = extConfig.tagDefinition;
+    checkDuplicateStarts(extTagDef, ext, filePath);
+
+    if (extTagDef.inherit) {
+      // Also check the combined (common + extension) definition.
+      const combined: TagDefinition = {
+        code: [...tagDefinition.code, ...extTagDef.code],
+        value: [...tagDefinition.value, ...extTagDef.value],
+        comment: [...tagDefinition.comment, ...extTagDef.comment],
+      };
+      checkDuplicateStarts(combined, ext, filePath, "(combined with common tagDefinition)");
+    }
   }
 
-  const tagDefinition: Record<string, ExtensionTagDefinition> = {};
-  const tagDefObj = obj["tagDefinition"] as Record<string, unknown>;
-
-  for (const [ext, extDef] of Object.entries(tagDefObj)) {
-    tagDefinition[ext] = validateExtensionTagDefinition(extDef, ext, filePath);
-  }
-
-  return { tagDefinition };
+  return { tagDefinition, extensions };
 }
 
-function validateExtensionTagDefinition(
-  value: unknown,
-  ext: string,
-  filePath: string
-): ExtensionTagDefinition {
+function validateCommonTagDefinition(value: unknown, filePath: string): TagDefinition {
+  if (value === undefined) {
+    return { code: [], value: [], comment: [] };
+  }
+
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     throw new KatazomeError(
-      `Setting file "${filePath}": tagDefinition["${ext}"] must be an object.`
+      `Setting file "${filePath}": "tagDefinition" must be an object.`
     );
   }
 
   const obj = value as Record<string, unknown>;
+  warnUnknownKeys(obj, ["code", "value", "comment"], filePath, `tagDefinition`);
 
-  const result: ExtensionTagDefinition = {
-    code: validateTagTypeDefinitions(obj["code"], ext, "code", filePath),
-    value: validateTagTypeDefinitions(obj["value"], ext, "value", filePath),
-    comment: validateTagTypeDefinitions(obj["comment"], ext, "comment", filePath),
+  const result: TagDefinition = {
+    code: parseTagTypeDefinitions(obj["code"], filePath, `tagDefinition.code`),
+    value: parseTagTypeDefinitions(obj["value"], filePath, `tagDefinition.value`),
+    comment: parseTagTypeDefinitions(obj["comment"], filePath, `tagDefinition.comment`),
   };
 
-  // Detect duplicate start strings within the same extension (across all tag kinds).
-  const seenStarts = new Map<string, string>();
-  for (const kind of ["code", "value", "comment"] as const) {
-    for (const [i, def] of result[kind].entries()) {
-      const location = `tagDefinition["${ext}"].${kind}[${i}].start`;
-      const firstLocation = seenStarts.get(def.start);
-      if (firstLocation !== undefined) {
-        throw new KatazomeError(
-          `Setting file "${filePath}": duplicate start string "${def.start}" at ${location} (already defined at ${firstLocation}).`
-        );
-      }
-      seenStarts.set(def.start, location);
+  checkDuplicateStarts(result, undefined, filePath);
+
+  return result;
+}
+
+function validateExtensionsMap(
+  value: unknown,
+  filePath: string
+): Record<string, ExtensionConfig> {
+  if (value === undefined) {
+    return {};
+  }
+
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new KatazomeError(
+      `Setting file "${filePath}": "extensions" must be an object.`
+    );
+  }
+
+  const obj = value as Record<string, unknown>;
+  const result: Record<string, ExtensionConfig> = {};
+
+  for (const [rawKey, extValue] of Object.entries(obj)) {
+    const key = rawKey.toLowerCase();
+    if (key in result) {
+      throw new KatazomeError(
+        `Setting file "${filePath}": duplicate extension key "${key}" (after lowercasing).`
+      );
     }
+    result[key] = validateExtensionConfig(extValue, key, filePath);
   }
 
   return result;
 }
 
-function validateTagTypeDefinitions(
+function validateExtensionConfig(
   value: unknown,
   ext: string,
-  kind: string,
   filePath: string
-): TagTypeDefinition[] {
-  if (!Array.isArray(value)) {
+): ExtensionConfig {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
     throw new KatazomeError(
-      `Setting file "${filePath}": tagDefinition["${ext}"].${kind} must be an array.`
+      `Setting file "${filePath}": extensions["${ext}"] must be an object.`
     );
   }
 
-  return value.map((item, i) => validateTagTypeDefinition(item, ext, kind, i, filePath));
+  const obj = value as Record<string, unknown>;
+  warnUnknownKeys(obj, ["tagDefinition"], filePath, `extensions["${ext}"]`);
+
+  return {
+    tagDefinition: validateExtensionTagDefinitionConfig(
+      obj["tagDefinition"],
+      ext,
+      filePath
+    ),
+  };
 }
 
-function validateTagTypeDefinition(
+function validateExtensionTagDefinitionConfig(
   value: unknown,
   ext: string,
-  kind: string,
-  index: number,
   filePath: string
-): TagTypeDefinition {
-  const location = `tagDefinition["${ext}"].${kind}[${index}]`;
+): ExtensionTagDefinitionConfig {
+  const location = `extensions["${ext}"].tagDefinition`;
+
+  if (value === undefined) {
+    return { inherit: true, code: [], value: [], comment: [] };
+  }
 
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     throw new KatazomeError(
@@ -121,6 +165,59 @@ function validateTagTypeDefinition(
   }
 
   const obj = value as Record<string, unknown>;
+  warnUnknownKeys(obj, ["inherit", "code", "value", "comment"], filePath, location);
+
+  let inherit = true;
+  if ("inherit" in obj) {
+    if (typeof obj["inherit"] !== "boolean") {
+      throw new KatazomeError(
+        `Setting file "${filePath}": ${location}.inherit must be a boolean.`
+      );
+    }
+    inherit = obj["inherit"];
+  }
+
+  return {
+    inherit,
+    code: parseTagTypeDefinitions(obj["code"], filePath, `${location}.code`),
+    value: parseTagTypeDefinitions(obj["value"], filePath, `${location}.value`),
+    comment: parseTagTypeDefinitions(obj["comment"], filePath, `${location}.comment`),
+  };
+}
+
+function parseTagTypeDefinitions(
+  value: unknown,
+  filePath: string,
+  location: string
+): TagTypeDefinition[] {
+  if (value === undefined) {
+    return [];
+  }
+
+  if (!Array.isArray(value)) {
+    throw new KatazomeError(
+      `Setting file "${filePath}": ${location} must be an array.`
+    );
+  }
+
+  return value.map((item, i) =>
+    validateTagTypeDefinition(item, filePath, `${location}[${i}]`)
+  );
+}
+
+function validateTagTypeDefinition(
+  value: unknown,
+  filePath: string,
+  location: string
+): TagTypeDefinition {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new KatazomeError(
+      `Setting file "${filePath}": ${location} must be an object.`
+    );
+  }
+
+  const obj = value as Record<string, unknown>;
+  warnUnknownKeys(obj, ["start", "end", "trim"], filePath, location);
 
   if (typeof obj["start"] !== "string" || obj["start"].length === 0) {
     throw new KatazomeError(
@@ -150,4 +247,55 @@ function validateTagTypeDefinition(
   }
 
   return def;
+}
+
+/**
+ * Checks for duplicate start strings within a TagDefinition (across all kinds).
+ * Throws KatazomeError on the first duplicate found.
+ *
+ * @param tagDef   The tag definition to check.
+ * @param ext      Extension name for error messages, or undefined for the common definition.
+ * @param filePath Setting file path for error messages.
+ * @param note     Optional suffix appended to the error message location.
+ */
+function checkDuplicateStarts(
+  tagDef: TagDefinition,
+  ext: string | undefined,
+  filePath: string,
+  note = ""
+): void {
+  const prefix = ext !== undefined
+    ? `extensions["${ext}"].tagDefinition`
+    : `tagDefinition`;
+  const locationSuffix = note ? ` ${note}` : "";
+
+  const seenStarts = new Map<string, string>();
+  for (const kind of ["code", "value", "comment"] as const) {
+    for (const [i, def] of tagDef[kind].entries()) {
+      const location = `${prefix}.${kind}[${i}].start${locationSuffix}`;
+      const firstLocation = seenStarts.get(def.start);
+      if (firstLocation !== undefined) {
+        throw new KatazomeError(
+          `Setting file "${filePath}": duplicate start string "${def.start}" at ${location} (already defined at ${firstLocation}).`
+        );
+      }
+      seenStarts.set(def.start, location);
+    }
+  }
+}
+
+function warnUnknownKeys(
+  obj: Record<string, unknown>,
+  knownKeys: string[],
+  filePath: string,
+  location: string
+): void {
+  const loc = location || "(root)";
+  for (const key of Object.keys(obj)) {
+    if (!knownKeys.includes(key)) {
+      console.warn(
+        `Setting file "${filePath}": unknown key "${key}" in ${loc} (ignored).`
+      );
+    }
+  }
 }

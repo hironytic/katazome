@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { tokenize } from "../src/core/tokenizer.ts";
 import { KatazomeError } from "../src/errors.ts";
-import type { ExtensionTagDefinition, LiteralToken, TagToken } from "../src/types.ts";
+import type { TagDefinition, LiteralToken, TagToken } from "../src/types.ts";
 
-const cTagDef: ExtensionTagDefinition = {
+const cTagDef: TagDefinition = {
   code: [
     { start: "/*{%", end: "%}*/" },
     { start: "/*{%-", end: "-%}*/", trim: "both" },

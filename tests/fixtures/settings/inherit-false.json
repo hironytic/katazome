@@ -7,7 +7,7 @@
           { "start": "/*{%", "end": "%}*/" }
         ],
         "value": [
-          { "start": "/*{%", "end": "_" }
+          { "start": "_V_", "end": "_" }
         ],
         "comment": [
           { "start": "/*{#", "end": "#}*/" }

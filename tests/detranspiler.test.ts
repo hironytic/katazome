@@ -2,10 +2,10 @@ import { describe, expect, test } from "bun:test";
 import { detranspile } from "../src/core/detranspiler.ts";
 import { tokenize } from "../src/core/tokenizer.ts";
 import { transpileTokens } from "../src/core/transpiler.ts";
-import type { ExtensionTagDefinition } from "../src/types.ts";
+import type { TagDefinition } from "../src/types.ts";
 import { KatazomeError } from "../src/errors.ts";
 
-const cTagDef: ExtensionTagDefinition = {
+const cTagDef: TagDefinition = {
   code: [
     { start: "/*{%", end: "%}*/" },
     { start: "/*{%-", end: "-%}*/", trim: "both" },

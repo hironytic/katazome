@@ -28,16 +28,30 @@ export interface TagTypeDefinition {
   trim?: TrimMode;
 }
 
-/** All tag definitions for a single file extension. */
-export interface ExtensionTagDefinition {
+/** One set of tag definitions: code, value, and comment arrays. */
+export interface TagDefinition {
   code: TagTypeDefinition[];
   value: TagTypeDefinition[];
   comment: TagTypeDefinition[];
 }
 
+/** Extension-specific tag definition config parsed from the setting file. */
+export interface ExtensionTagDefinitionConfig extends TagDefinition {
+  /** Whether to inherit (and append to) the common tag definition. Default: true. */
+  inherit: boolean;
+}
+
+/** Extension-specific settings (after loading — all fields filled in with defaults). */
+export interface ExtensionConfig {
+  tagDefinition: ExtensionTagDefinitionConfig;
+}
+
 /** The parsed setting file structure. */
 export interface Setting {
-  tagDefinition: Record<string, ExtensionTagDefinition>;
+  /** Common tag definitions applied to all extensions (may have empty arrays). */
+  tagDefinition: TagDefinition;
+  /** Extension-specific settings. Keys are normalized to lowercase. */
+  extensions: Record<string, ExtensionConfig>;
 }
 
 // ---------------------------------------------------------------------------

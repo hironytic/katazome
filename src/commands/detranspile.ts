@@ -93,7 +93,7 @@ async function detranspileFile(
     );
   }
 
-  const tagDef = getTagDefForExtension(setting, ext, displayName);
+  const tagDef = getTagDefForExtension(setting, ext);
 
   let transpilateContent: string;
   try {

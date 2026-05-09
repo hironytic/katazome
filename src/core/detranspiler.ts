@@ -1,4 +1,4 @@
-import type { ExtensionTagDefinition } from "../types.ts";
+import type { TagDefinition } from "../types.ts";
 import { KatazomeError } from "../errors.ts";
 
 /**
@@ -16,7 +16,7 @@ import { KatazomeError } from "../errors.ts";
  * @param tagDef  Tag definitions for the original file's extension.
  * @returns       The reconstructed template source.
  */
-export function detranspile(text: string, tagDef: ExtensionTagDefinition): string {
+export function detranspile(text: string, tagDef: TagDefinition): string {
   const parts: string[] = [];
   let pos = 0;
 
@@ -77,7 +77,7 @@ function isAtRecognizedPattern(text: string, pos: number): boolean {
 function tryMatchPattern(
   text: string,
   pos: number,
-  tagDef: ExtensionTagDefinition
+  tagDef: TagDefinition
 ): MatchResult | undefined {
   // Pattern 1-5: comment markings
   if (text.startsWith("/*ktzm:", pos)) {
@@ -99,7 +99,7 @@ function tryMatchPattern(
 function tryMatchMarking(
   text: string,
   pos: number,
-  tagDef: ExtensionTagDefinition
+  tagDef: TagDefinition
 ): MatchResult | undefined {
   // Determine the marking kind by peeking at the name.
   const afterPrefix = pos + "/*ktzm:".length;
@@ -170,7 +170,7 @@ function matchTagMarking(
   text: string,
   pos: number,
   kind: "code" | "value" | "comment",
-  tagDef: ExtensionTagDefinition
+  tagDef: TagDefinition
 ): MatchResult {
   // Structure: /*ktzm:KIND(N){*/ CONTENT /*}ktzm*/
   const prefixPart = `/*ktzm:${kind}(`;

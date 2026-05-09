@@ -1,0 +1,16 @@
+{
+  "tagDefinition": {
+    "code": [
+      { "start": "/*{%", "end": "%}*/" }
+    ]
+  },
+  "extensions": {
+    "c": {
+      "tagDefinition": {
+        "code": [
+          { "start": "/*{%", "end": "-%}*/" }
+        ]
+      }
+    }
+  }
+}
