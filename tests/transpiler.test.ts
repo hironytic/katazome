@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { transpileTokens, escapeString } from "../src/core/transpiler.ts";
 import { tokenize } from "../src/core/tokenizer.ts";
-import type { ExtensionTagDefinition } from "../src/types.ts";
+import type { TagDefinition } from "../src/types.ts";
 import { KatazomeError } from "../src/errors.ts";
 
-const cTagDef: ExtensionTagDefinition = {
+const cTagDef: TagDefinition = {
   code: [
     { start: "/*{%", end: "%}*/" },
     { start: "/*{%-", end: "-%}*/", trim: "both" },
@@ -88,7 +88,7 @@ describe("transpileTokens", () => {
   });
 
   test("trim 'start' only trims text before the tag", () => {
-    const customDef: ExtensionTagDefinition = {
+    const customDef: TagDefinition = {
       code: [{ start: "[%", end: "%]", trim: "start" }],
       value: [],
       comment: [],
@@ -100,7 +100,7 @@ describe("transpileTokens", () => {
   });
 
   test("trim 'end' only trims text after the tag", () => {
-    const customDef: ExtensionTagDefinition = {
+    const customDef: TagDefinition = {
       code: [{ start: "[%", end: "%]", trim: "end" }],
       value: [],
       comment: [],

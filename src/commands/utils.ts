@@ -1,7 +1,7 @@
 import { resolve, dirname, relative } from "node:path";
 import { mkdirSync } from "node:fs";
 import { KatazomeError } from "../errors.ts";
-import type { ExtensionTagDefinition, Setting } from "../types.ts";
+import type { TagDefinition, Setting } from "../types.ts";
 
 /**
  * Resolves two paths to absolute and checks they are not the same.
@@ -18,22 +18,36 @@ export function assertNotSamePath(inputPath: string, outputPath: string): void {
 }
 
 /**
- * Returns the tag definition for the given file extension.
- * Throws KatazomeError if the extension is not defined in settings.
+ * Resolves the effective tag definition for the given file extension.
+ * If the extension is not listed in settings, the common definition is used.
+ * If inherit is true (default), the common and extension-specific definitions are combined.
+ * If inherit is false, only the extension-specific definition is used.
  */
 export function getTagDefForExtension(
   setting: Setting,
-  ext: string,
-  filePath: string
-): ExtensionTagDefinition {
-  const tagDef = setting.tagDefinition[ext];
-  if (tagDef === undefined) {
-    throw new KatazomeError(
-      `No tag definition found for extension ".${ext}" (file: "${filePath}"). ` +
-      `Add it to the setting file.`
-    );
+  ext: string
+): TagDefinition {
+  const extConfig = setting.extensions[ext.toLowerCase()];
+
+  if (extConfig === undefined) {
+    return setting.tagDefinition;
   }
-  return tagDef;
+
+  const extTagDef = extConfig.tagDefinition;
+
+  if (!extTagDef.inherit) {
+    return {
+      code: extTagDef.code,
+      value: extTagDef.value,
+      comment: extTagDef.comment,
+    };
+  }
+
+  return {
+    code: [...setting.tagDefinition.code, ...extTagDef.code],
+    value: [...setting.tagDefinition.value, ...extTagDef.value],
+    comment: [...setting.tagDefinition.comment, ...extTagDef.comment],
+  };
 }
 
 /**
@@ -44,7 +58,7 @@ export function getExtension(filePath: string): string | undefined {
   const name = filePath.split("/").pop() ?? filePath;
   const dotIndex = name.lastIndexOf(".");
   if (dotIndex <= 0) return undefined;
-  return name.slice(dotIndex + 1);
+  return name.slice(dotIndex + 1).toLowerCase();
 }
 
 /**

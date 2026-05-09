@@ -103,7 +103,7 @@ async function transpileFile(
     );
   }
 
-  const tagDef = getTagDefForExtension(setting, ext, displayName);
+  const tagDef = getTagDefForExtension(setting, ext);
 
   let templateContent: string;
   try {

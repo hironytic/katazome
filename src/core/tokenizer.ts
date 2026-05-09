@@ -1,4 +1,4 @@
-import type { ExtensionTagDefinition, TagKind, TagToken, TagTypeDefinition, Token, TrimMode } from "../types.ts";
+import type { TagDefinition, TagKind, TagToken, TagTypeDefinition, Token, TrimMode } from "../types.ts";
 import { KatazomeError } from "../errors.ts";
 
 /** Strings that must not appear in literal text (they would collide with comment markings). */
@@ -18,7 +18,7 @@ interface TagCandidate {
  * @returns       An array of tokens in document order.
  * @throws        KatazomeError on syntax errors (forbidden text, unclosed tags, etc.)
  */
-export function tokenize(text: string, tagDef: ExtensionTagDefinition): Token[] {
+export function tokenize(text: string, tagDef: TagDefinition): Token[] {
   // Build a flat list of all tag candidates with their start strings.
   const candidates: TagCandidate[] = [];
 

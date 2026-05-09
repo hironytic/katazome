@@ -2,13 +2,13 @@ import { describe, expect, test } from "bun:test";
 import { render } from "../src/core/renderer.ts";
 import { tokenize } from "../src/core/tokenizer.ts";
 import { transpileTokens } from "../src/core/transpiler.ts";
-import type { ExtensionTagDefinition } from "../src/types.ts";
+import type { TagDefinition } from "../src/types.ts";
 import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
 
-const cTagDef: ExtensionTagDefinition = {
+const cTagDef: TagDefinition = {
   code: [
     { start: "/*{%", end: "%}*/" },
     { start: "/*{%-", end: "-%}*/", trim: "both" },
