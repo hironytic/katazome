@@ -9,8 +9,36 @@ describe("loadSetting", () => {
   // Basic file handling
   // -------------------------------------------------------------------------
 
-  test("throws on unsupported file extension", async () => {
-    await expect(loadSetting("/some/file.yaml")).rejects.toThrow(KatazomeError);
+  test("loads .yaml setting file", async () => {
+    const setting = await loadSetting(`${fixturesDir}c-style.yaml`);
+    expect(setting.tagDefinition.code).toHaveLength(2);
+    expect(setting.tagDefinition.code[0]).toEqual({ start: "/*{%", end: "%}*/" });
+    expect(setting.tagDefinition.code[1]).toEqual({ start: "/*{%-", end: "-%}*/", trim: "both" });
+  });
+
+  test("loads .toml setting file", async () => {
+    const setting = await loadSetting(`${fixturesDir}c-style.toml`);
+    expect(setting.tagDefinition.code).toHaveLength(2);
+    expect(setting.tagDefinition.code[0]).toEqual({ start: "/*{%", end: "%}*/" });
+    expect(setting.tagDefinition.code[1]).toEqual({ start: "/*{%-", end: "-%}*/", trim: "both" });
+  });
+
+  test("loads .json5 setting file with comments", async () => {
+    const setting = await loadSetting(`${fixturesDir}c-style.json5`);
+    expect(setting.tagDefinition.code).toHaveLength(2);
+    expect(setting.tagDefinition.comment).toHaveLength(1);
+  });
+
+  test("falls back to JSON5 for unknown extension", async () => {
+    const settingJson = '{ tagDefinition: { code: [{ start: "<%", end: "%>" }] } }';
+    const tmpPath = `${import.meta.dir}/tmp-unknown-ext.ktzm`;
+    await Bun.write(tmpPath, settingJson);
+    try {
+      const setting = await loadSetting(tmpPath);
+      expect(setting.tagDefinition.code).toHaveLength(1);
+    } finally {
+      await Bun.spawn(["rm", "-f", tmpPath]).exited;
+    }
   });
 
   test("throws on non-existent file", async () => {

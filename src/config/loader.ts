@@ -1,4 +1,4 @@
-import JSON5 from "json5";
+import { readAndParse } from "../utils/file-parser.ts";
 import type {
   ExtensionConfig,
   ExtensionTagDefinitionConfig,
@@ -10,31 +10,11 @@ import { KatazomeError } from "../errors.ts";
 
 /**
  * Loads and validates a setting file.
- * Supported formats: .json, .json5
+ * Supported formats: .json, .json5, .yaml, .yml, .toml
+ * Files with unknown or no extension are parsed as JSON5.
  */
 export async function loadSetting(filePath: string): Promise<Setting> {
-  const ext = filePath.split(".").pop()?.toLowerCase();
-  if (ext !== "json" && ext !== "json5") {
-    throw new KatazomeError(
-      `Unsupported setting file format: "${filePath}". Use .json or .json5.`
-    );
-  }
-
-  let raw: string;
-  try {
-    raw = await Bun.file(filePath).text();
-  } catch {
-    throw new KatazomeError(`Cannot read setting file: "${filePath}"`);
-  }
-
-  let parsed: unknown;
-  try {
-    parsed = ext === "json5" ? JSON5.parse(raw) : JSON.parse(raw);
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    throw new KatazomeError(`Failed to parse setting file "${filePath}": ${msg}`);
-  }
-
+  const parsed = await readAndParse(filePath, "setting file");
   return validateSetting(parsed, filePath);
 }
 

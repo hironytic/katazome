@@ -61,7 +61,7 @@ bun run typecheck
 
 ### Input data normalization
 
-The main process parses `--input` files (JSON or JSON5) and re-serializes the result as **plain JSON** to a temp file. The runtime (`ktzm-runtime.ts`) only reads plain JSON. This means all format handling (JSON5 etc.) is confined to the main process; the runtime has no parser dependency.
+The main process parses `--input` files (JSON, JSON5, YAML, or TOML) and re-serializes the result as **plain JSON** to a temp file. The runtime (`ktzm-runtime.ts`) only reads plain JSON. This means all format handling is confined to the main process; the runtime has no parser dependency.
 
 ### tagIndex and setting file compatibility
 
