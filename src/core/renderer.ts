@@ -6,10 +6,11 @@ import { generateRuntimeContent } from "../runtime/content.ts";
 import { KatazomeError } from "../errors.ts";
 
 /**
- * Renders a transpilate by running it with Bun as a subprocess.
+ * Renders a transpilate by running it in a Worker thread.
  *
- * Input data is embedded directly into the runtime file as a JSON literal.
- * The runtime writes its output to KTZM_OUTPUT_FILE (passed as an env var).
+ * Input data and the output file path are embedded directly into the runtime
+ * file as JSON/string literals. The runtime writes its output to that path on
+ * process exit, which fires reliably within the Worker's own event loop.
  *
  * @param transpilateContent  The TypeScript transpilate source code.
  * @param inputData           Parsed input data (embedded into the runtime).
@@ -27,28 +28,35 @@ export async function render(
     const runtimePath = join(tmpDir, "ktzm-runtime.ts");
     const transpilatePath = join(tmpDir, "transpilate.ts");
 
-    writeFileSync(runtimePath, generateRuntimeContent(inputData), "utf-8");
+    writeFileSync(runtimePath, generateRuntimeContent(inputData, outputFilePath), "utf-8");
     writeFileSync(transpilatePath, transpilateContent, "utf-8");
     // Pre-create the output file so it always exists after render, even if
     // the template produces no output (the runtime will overwrite it).
     writeFileSync(outputFilePath, "", "utf-8");
 
-    const proc = Bun.spawn(["bun", "run", transpilatePath], {
-      env: {
-        ...process.env,
-        KTZM_OUTPUT_FILE: outputFilePath,
-      },
-      stdout: "inherit",
-      stderr: "pipe",
+    const worker = new Worker(transpilatePath);
+    let settled = false;
+    await new Promise<void>((resolve, reject) => {
+      const fail = (msg: string) => {
+        if (!settled) {
+          settled = true;
+          reject(new KatazomeError(msg));
+        }
+      };
+      worker.addEventListener("close", (event) => {
+        if (!settled) {
+          settled = true;
+          if (event.code === 0) {
+            resolve();
+          } else {
+            fail(`Template execution failed with exit code ${event.code}.`);
+          }
+        }
+      });
+      worker.addEventListener("error", (event) => {
+        fail(`Template execution failed:\n${event.message}`);
+      });
     });
-
-    const exitCode = await proc.exited;
-
-    if (exitCode !== 0) {
-      const stderrText = await new Response(proc.stderr).text();
-      process.stderr.write(stderrText);
-      throw new KatazomeError(`Template execution failed with exit code ${exitCode}.`);
-    }
   } finally {
     rmSync(tmpDir, { recursive: true, force: true });
   }
