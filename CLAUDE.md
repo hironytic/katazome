@@ -4,6 +4,8 @@
 
 - **`undefined` over `null`**: use `undefined` to represent the absence of a value. `null` is only acceptable where the bun's API or the third-party libraries explicitly require it. Values received as `null` from external sources should be converted with `?? undefined` before use in internal code.
 
+- **`transpile` as a debugging aid for `generate`**: The primary command is `generate` (transpile + render in one step). When `generate` fails at render time, users need to inspect the intermediate transpilate to debug code tags and value tags they wrote. `transpile` serves this purpose: it produces the same transpilate that `generate` uses internally, so users can run it directly with `bun run` to reproduce and investigate failures. `detranspile` then helps them apply any fixes made in the transpilate back to the original template. This means **the transpilate produced by `transpile` and the transpilate used internally by `generate` must behave as consistently as possible**. Designs that cause `generate`'s internal execution to diverge from a plain `bun run` of the transpilate undermine the debugging workflow.
+
 ---
 
 ## Terminology
