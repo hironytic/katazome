@@ -8,11 +8,12 @@ import {
   getTagDefForExtension,
   getExtension,
   ensureDir,
+  resolveSettingPath,
 } from "./utils.ts";
 import { KatazomeError } from "../errors.ts";
 
 export interface DetranspileOptions {
-  setting: string;
+  setting?: string;
   transpilatePath: string;
   outputPath?: string;
 }
@@ -21,9 +22,11 @@ export interface DetranspileOptions {
  * Runs the `detranspile` command: converts transpilate file(s) back to template(s).
  */
 export async function runDetranspile(options: DetranspileOptions): Promise<void> {
-  const setting = await loadSetting(options.setting);
+  const settingPath = resolveSettingPath(options.setting, options.transpilatePath);
+  const setting = await loadSetting(settingPath);
 
   const inputAbs = resolve(options.transpilatePath);
+  const settingAbs = resolve(settingPath);
   const isDirectory = existsSync(inputAbs) && statSync(inputAbs).isDirectory();
 
   if (isDirectory) {
@@ -37,6 +40,7 @@ export async function runDetranspile(options: DetranspileOptions): Promise<void>
 
     const files = walkDirectory(inputAbs);
     for (const file of files) {
+      if (file.absolutePath === settingAbs) continue;
       // Strip .ts from the relative path to get the output file name.
       if (!file.relativePath.endsWith(".ts")) {
         throw new KatazomeError(
@@ -46,6 +50,11 @@ export async function runDetranspile(options: DetranspileOptions): Promise<void>
       }
       const outRelPath = file.relativePath.slice(0, -3); // remove ".ts"
       const outAbsPath = join(outputAbs, outRelPath);
+      if (outAbsPath === settingAbs) {
+        throw new KatazomeError(
+          `Output path conflicts with the setting file: "${outAbsPath}"`
+        );
+      }
       assertNotSamePath(file.absolutePath, outAbsPath);
       await detranspileFile(file.absolutePath, outAbsPath, setting, file.relativePath);
     }
@@ -55,6 +64,16 @@ export async function runDetranspile(options: DetranspileOptions): Promise<void>
       ? resolve(options.outputPath)
       : computeDefaultOutputPath(inputAbs);
 
+    if (inputAbs === settingAbs) {
+      throw new KatazomeError(
+        `The input file is the same as the setting file: "${inputAbs}"`
+      );
+    }
+    if (outputAbs === settingAbs) {
+      throw new KatazomeError(
+        `Output path conflicts with the setting file: "${outputAbs}"`
+      );
+    }
     assertNotSamePath(inputAbs, outputAbs);
     await detranspileFile(inputAbs, outputAbs, setting, basename(options.transpilatePath));
   }

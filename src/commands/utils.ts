@@ -1,7 +1,38 @@
-import { resolve, dirname, relative } from "node:path";
-import { mkdirSync } from "node:fs";
+import { resolve, dirname, relative, join } from "node:path";
+import { mkdirSync, existsSync, statSync } from "node:fs";
 import { KatazomeError } from "../errors.ts";
 import type { TagDefinition, Setting } from "../types.ts";
+
+const SETTING_EXTS = ["json", "json5", "yaml", "toml"] as const;
+const SETTING_BASE = "ktzm-setting";
+
+/**
+ * Resolves the path to the setting file.
+ * If settingPath is given, returns it as-is.
+ * Otherwise searches for ktzm-setting.{json,json5,yaml,toml} in the same
+ * directory as inputPath (treating inputPath as a file) or in inputPath itself
+ * (if it is a directory).
+ */
+export function resolveSettingPath(
+  settingPath: string | undefined,
+  inputPath: string
+): string {
+  if (settingPath !== undefined) return settingPath;
+
+  const inputAbs = resolve(inputPath);
+  const dir = existsSync(inputAbs) && statSync(inputAbs).isDirectory()
+    ? inputAbs
+    : dirname(inputAbs);
+
+  for (const ext of SETTING_EXTS) {
+    const candidate = join(dir, `${SETTING_BASE}.${ext}`);
+    if (existsSync(candidate)) return candidate;
+  }
+
+  throw new KatazomeError(
+    `Setting file not found. Looked for "${SETTING_BASE}.{json,json5,yaml,toml}" in "${dir}".`
+  );
+}
 
 /**
  * Resolves two paths to absolute and checks they are not the same.

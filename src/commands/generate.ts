@@ -11,11 +11,12 @@ import {
   getTagDefForExtension,
   getExtension,
   ensureDir,
+  resolveSettingPath,
 } from "./utils.ts";
 import { KatazomeError } from "../errors.ts";
 
 export interface GenerateOptions {
-  setting: string;
+  setting?: string;
   input?: string;
   templatePath: string;
   outputPath: string;
@@ -25,10 +26,12 @@ export interface GenerateOptions {
  * Runs the `generate` command: renders a template file (or directory) to the final output.
  */
 export async function runGenerate(options: GenerateOptions): Promise<void> {
-  const setting = await loadSetting(options.setting);
+  const settingPath = resolveSettingPath(options.setting, options.templatePath);
+  const setting = await loadSetting(settingPath);
   const inputData = options.input !== undefined ? await loadInput(options.input) : {};
 
   const templateAbs = resolve(options.templatePath);
+  const settingAbs = resolve(settingPath);
   const outputAbs = resolve(options.outputPath);
   const isDirectory = existsSync(templateAbs) && statSync(templateAbs).isDirectory();
 
@@ -37,7 +40,13 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
   if (isDirectory) {
     const files = walkDirectory(templateAbs);
     for (const file of files) {
+      if (file.absolutePath === settingAbs) continue;
       const outAbsPath = join(outputAbs, file.relativePath);
+      if (outAbsPath === settingAbs) {
+        throw new KatazomeError(
+          `Output path conflicts with the setting file: "${outAbsPath}"`
+        );
+      }
       assertNotSamePath(file.absolutePath, outAbsPath);
       await generateFile(
         file.absolutePath,
@@ -48,6 +57,16 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
       );
     }
   } else {
+    if (templateAbs === settingAbs) {
+      throw new KatazomeError(
+        `The template file is the same as the setting file: "${templateAbs}"`
+      );
+    }
+    if (outputAbs === settingAbs) {
+      throw new KatazomeError(
+        `Output path conflicts with the setting file: "${outputAbs}"`
+      );
+    }
     await generateFile(
       templateAbs,
       outputAbs,
