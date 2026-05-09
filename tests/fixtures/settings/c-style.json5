@@ -1,0 +1,29 @@
+// c-style setting (JSON5 format with comments)
+{
+  tagDefinition: {
+    code: [
+      { start: "/*{%", end: "%}*/" },
+      { start: "/*{%-", end: "-%}*/", trim: "both" },
+    ],
+    comment: [
+      { start: "/*{#", end: "#}*/" },
+    ],
+  },
+  extensions: {
+    c: {
+      tagDefinition: {
+        value: [
+          { start: "_V_", end: "_" },
+          { start: "_V(\"", end: "\")" },
+        ],
+      },
+    },
+    ts: {
+      tagDefinition: {
+        value: [
+          { start: "_V_", end: "_" },
+        ],
+      },
+    },
+  },
+}

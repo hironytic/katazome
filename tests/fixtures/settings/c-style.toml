@@ -1,0 +1,24 @@
+[[tagDefinition.code]]
+start = "/*{%"
+end = "%}*/"
+
+[[tagDefinition.code]]
+start = "/*{%-"
+end = "-%}*/"
+trim = "both"
+
+[[tagDefinition.comment]]
+start = "/*{#"
+end = "#}*/"
+
+[[extensions.c.tagDefinition.value]]
+start = "_V_"
+end = "_"
+
+[[extensions.c.tagDefinition.value]]
+start = "_V(\""
+end = "\")"
+
+[[extensions.ts.tagDefinition.value]]
+start = "_V_"
+end = "_"
