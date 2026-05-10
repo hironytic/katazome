@@ -18,6 +18,7 @@
 | render | Step 2: execute the transpilate with Bun to produce the final output file |
 | generate | Steps 1+2 combined in a single command |
 | detranspile | Reverse a transpilate back into the original template (for debugging) |
+| transpile session | Output of `transpile` recording what was transpiled and where; used as input to `detranspile` (`ktzm-session.json`) |
 | transpiled file | Output of transpile (e.g. `template.c.ts`) |
 | generated file | Output of render/generate (the final file, e.g. `output.c`) |
 | code tag | A tag that embeds raw TypeScript code into the transpilate |
