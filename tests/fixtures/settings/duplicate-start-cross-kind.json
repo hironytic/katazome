@@ -1,6 +1,7 @@
 {
-  "extensions": {
-    "c": {
+  "files": [
+    {
+      "pattern": "*.c",
       "tagDefinition": {
         "inherit": false,
         "code": [
@@ -14,5 +15,5 @@
         ]
       }
     }
-  }
+  ]
 }

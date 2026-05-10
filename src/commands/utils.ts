@@ -1,7 +1,8 @@
-import { resolve, dirname, relative, join } from "node:path";
+import { resolve, dirname, relative, join, basename } from "node:path";
 import { mkdirSync, existsSync, statSync } from "node:fs";
+import { createInterface } from "node:readline";
 import { KatazomeError } from "../errors.ts";
-import type { TagDefinition, Setting } from "../types.ts";
+import type { ExistingFileBehavior, FilePatternConfig, TagDefinition, Setting } from "../types.ts";
 
 const SETTING_EXTS = ["json", "json5", "yaml", "toml"] as const;
 const SETTING_BASE = "ktzm-setting";
@@ -49,47 +50,89 @@ export function assertNotSamePath(inputPath: string, outputPath: string): void {
 }
 
 /**
- * Resolves the effective tag definition for the given file extension.
- * If the extension is not listed in settings, the common definition is used.
- * If inherit is true (default), the common and extension-specific definitions are combined.
- * If inherit is false, only the extension-specific definition is used.
+ * Returns true if the filename matches the given glob pattern.
+ * Only * wildcards are supported; matching is case-insensitive.
+ * The pattern is matched against the filename only (not the path).
  */
-export function getTagDefForExtension(
-  setting: Setting,
-  ext: string
-): TagDefinition {
-  const extConfig = setting.extensions[ext.toLowerCase()];
+export function matchPattern(filename: string, pattern: string): boolean {
+  const escaped = pattern
+    .toLowerCase()
+    .replace(/[.+^${}()|[\]\\]/g, "\\$&")
+    .replace(/\*/g, ".*");
+  return new RegExp(`^${escaped}$`).test(filename.toLowerCase());
+}
 
-  if (extConfig === undefined) {
+/**
+ * Finds the first FilePatternConfig whose pattern matches the given filename.
+ * Exact patterns (no wildcard) take priority over wildcard patterns.
+ * Among wildcard patterns, the first match in array order wins.
+ */
+export function findFilePatternConfig(
+  setting: Setting,
+  filename: string
+): FilePatternConfig | undefined {
+  // Exact match first (pattern contains no wildcard)
+  const exact = setting.files.find(
+    (f) => !f.pattern.includes("*") && matchPattern(filename, f.pattern)
+  );
+  if (exact !== undefined) return exact;
+
+  // Wildcard: first match wins
+  return setting.files.find(
+    (f) => f.pattern.includes("*") && matchPattern(filename, f.pattern)
+  );
+}
+
+/**
+ * Resolves the effective tag definition for the given filename.
+ * If no file pattern matches, the common definition is used.
+ * If inherit is true (default), the common and pattern-specific definitions are combined.
+ * If inherit is false, only the pattern-specific definition is used.
+ */
+export function getTagDefForFile(
+  setting: Setting,
+  filename: string
+): TagDefinition {
+  const fileConfig = findFilePatternConfig(setting, filename);
+
+  if (fileConfig === undefined) {
     return setting.tagDefinition;
   }
 
-  const extTagDef = extConfig.tagDefinition;
+  const fileTagDef = fileConfig.tagDefinition;
 
-  if (!extTagDef.inherit) {
+  if (!fileTagDef.inherit) {
     return {
-      code: extTagDef.code,
-      value: extTagDef.value,
-      comment: extTagDef.comment,
+      code: fileTagDef.code,
+      value: fileTagDef.value,
+      comment: fileTagDef.comment,
     };
   }
 
   return {
-    code: [...setting.tagDefinition.code, ...extTagDef.code],
-    value: [...setting.tagDefinition.value, ...extTagDef.value],
-    comment: [...setting.tagDefinition.comment, ...extTagDef.comment],
+    code: [...setting.tagDefinition.code, ...fileTagDef.code],
+    value: [...setting.tagDefinition.value, ...fileTagDef.value],
+    comment: [...setting.tagDefinition.comment, ...fileTagDef.comment],
   };
 }
 
 /**
- * Extracts the extension (without leading dot) from a filename.
- * Returns undefined if the filename has no extension.
+ * Returns the effective ExistingFileBehavior for the given filename.
+ * Falls back to the root-level setting, then to "overwrite".
  */
-export function getExtension(filePath: string): string | undefined {
-  const name = filePath.split("/").pop() ?? filePath;
-  const dotIndex = name.lastIndexOf(".");
-  if (dotIndex <= 0) return undefined;
-  return name.slice(dotIndex + 1).toLowerCase();
+export function getExistingFileBehavior(
+  setting: Setting,
+  filename: string
+): ExistingFileBehavior {
+  const fileConfig = findFilePatternConfig(setting, filename);
+  return fileConfig?.existingFile ?? setting.existingFile ?? "overwrite";
+}
+
+/**
+ * Returns true if the filename matches any pattern in setting.exclude.
+ */
+export function isExcluded(setting: Setting, filename: string): boolean {
+  return setting.exclude.some((pattern) => matchPattern(filename, pattern));
 }
 
 /**
@@ -111,4 +154,37 @@ export function computeRuntimeImportPath(
   // Ensure the path starts with "./"
   if (rel.startsWith("..") || rel.startsWith("/")) return rel;
   return `./${rel}`;
+}
+
+/**
+ * Prompts the user with a yes/no question and returns true if the answer is "y".
+ */
+export async function askConfirmation(message: string): Promise<boolean> {
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  return new Promise((resolve) => {
+    rl.question(`${message} [y/N] `, (answer) => {
+      rl.close();
+      resolve(answer.trim().toLowerCase() === "y");
+    });
+  });
+}
+
+/**
+ * Prompts the user to choose how to handle an existing output file.
+ * Returns "overwrite", "skip", or "error".
+ * Default (Enter) is "skip".
+ */
+export async function askExistingFileAction(
+  displayName: string
+): Promise<"overwrite" | "skip" | "error"> {
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  return new Promise((resolve) => {
+    rl.question(`"${displayName}" already exists. (o)verwrite, (S)kip, (e)rror? `, (answer) => {
+      rl.close();
+      const a = answer.trim().toLowerCase();
+      if (a === "o") resolve("overwrite");
+      else if (a === "e") resolve("error");
+      else resolve("skip");
+    });
+  });
 }

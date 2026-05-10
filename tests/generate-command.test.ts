@@ -7,14 +7,15 @@ import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
 
 const settingJson = JSON.stringify({
-  extensions: {
-    txt: {
+  files: [
+    {
+      pattern: "*.txt",
       tagDefinition: {
         code: [{ start: "/*{%", end: "%}*/" }],
         value: [{ start: "_V_", end: "_" }],
       },
     },
-  },
+  ],
 });
 
 function withTempDir(fn: (dir: string) => Promise<void>): Promise<void> {
@@ -143,6 +144,151 @@ describe("runGenerate without --input", () => {
       await runGenerate({ setting: settingPath, templatePath, outputPath });
 
       expect(await Bun.file(outputPath).text()).toBe("default");
+    });
+  });
+});
+
+describe("runGenerate existingFile behavior", () => {
+  test("existingFile: overwrite replaces existing file (default)", async () => {
+    await withTempDir(async (dir) => {
+      const settingPath = join(dir, "setting.json");
+      const templatePath = join(dir, "template.txt");
+      const outputPath = join(dir, "output.txt");
+
+      writeFileSync(settingPath, JSON.stringify({ existingFile: "overwrite" }), "utf-8");
+      writeFileSync(templatePath, "new content\n", "utf-8");
+      writeFileSync(outputPath, "old content\n", "utf-8");
+
+      await runGenerate({ setting: settingPath, templatePath, outputPath });
+
+      expect(await Bun.file(outputPath).text()).toBe("new content\n");
+    });
+  });
+
+  test("existingFile: skip leaves existing file unchanged", async () => {
+    await withTempDir(async (dir) => {
+      const settingPath = join(dir, "setting.json");
+      const templatePath = join(dir, "template.txt");
+      const outputPath = join(dir, "output.txt");
+
+      writeFileSync(settingPath, JSON.stringify({ existingFile: "skip" }), "utf-8");
+      writeFileSync(templatePath, "new content\n", "utf-8");
+      writeFileSync(outputPath, "old content\n", "utf-8");
+
+      await runGenerate({ setting: settingPath, templatePath, outputPath });
+
+      expect(await Bun.file(outputPath).text()).toBe("old content\n");
+    });
+  });
+
+  test("existingFile: skip generates new files that don't exist yet", async () => {
+    await withTempDir(async (dir) => {
+      const settingPath = join(dir, "setting.json");
+      const templatePath = join(dir, "template.txt");
+      const outputPath = join(dir, "output.txt");
+
+      writeFileSync(settingPath, JSON.stringify({ existingFile: "skip" }), "utf-8");
+      writeFileSync(templatePath, "new content\n", "utf-8");
+
+      await runGenerate({ setting: settingPath, templatePath, outputPath });
+
+      expect(await Bun.file(outputPath).text()).toBe("new content\n");
+    });
+  });
+
+  test("existingFile: error throws when output file exists", async () => {
+    await withTempDir(async (dir) => {
+      const settingPath = join(dir, "setting.json");
+      const templatePath = join(dir, "template.txt");
+      const outputPath = join(dir, "output.txt");
+
+      writeFileSync(settingPath, JSON.stringify({ existingFile: "error" }), "utf-8");
+      writeFileSync(templatePath, "new content\n", "utf-8");
+      writeFileSync(outputPath, "old content\n", "utf-8");
+
+      await expect(
+        runGenerate({ setting: settingPath, templatePath, outputPath })
+      ).rejects.toThrow(KatazomeError);
+    });
+  });
+
+  test("existingFile: error does not throw when output file does not exist", async () => {
+    await withTempDir(async (dir) => {
+      const settingPath = join(dir, "setting.json");
+      const templatePath = join(dir, "template.txt");
+      const outputPath = join(dir, "output.txt");
+
+      writeFileSync(settingPath, JSON.stringify({ existingFile: "error" }), "utf-8");
+      writeFileSync(templatePath, "new content\n", "utf-8");
+
+      await runGenerate({ setting: settingPath, templatePath, outputPath });
+
+      expect(await Bun.file(outputPath).text()).toBe("new content\n");
+    });
+  });
+
+  test("per-file pattern existingFile overrides root setting", async () => {
+    await withTempDir(async (dir) => {
+      const inputDir = join(dir, "src");
+      const outputDir = join(dir, "out");
+      mkdirSync(inputDir, { recursive: true });
+      mkdirSync(outputDir, { recursive: true });
+
+      const setting = {
+        existingFile: "overwrite",
+        files: [{ pattern: "keep.txt", existingFile: "skip" }],
+      };
+      writeFileSync(join(inputDir, "ktzm-setting.json"), JSON.stringify(setting), "utf-8");
+      writeFileSync(join(inputDir, "keep.txt"), "new keep\n", "utf-8");
+      writeFileSync(join(inputDir, "replace.txt"), "new replace\n", "utf-8");
+      writeFileSync(join(outputDir, "keep.txt"), "old keep\n", "utf-8");
+      writeFileSync(join(outputDir, "replace.txt"), "old replace\n", "utf-8");
+
+      await runGenerate({ templatePath: inputDir, outputPath: outputDir });
+
+      // "keep.txt" matches the skip pattern — unchanged
+      expect(await Bun.file(join(outputDir, "keep.txt")).text()).toBe("old keep\n");
+      // "replace.txt" falls through to root "overwrite"
+      expect(await Bun.file(join(outputDir, "replace.txt")).text()).toBe("new replace\n");
+    });
+  });
+
+  test("existingFile: error stops processing on first conflict in directory mode", async () => {
+    await withTempDir(async (dir) => {
+      const inputDir = join(dir, "src");
+      const outputDir = join(dir, "out");
+      mkdirSync(inputDir, { recursive: true });
+      mkdirSync(outputDir, { recursive: true });
+
+      writeFileSync(join(inputDir, "ktzm-setting.json"), JSON.stringify({ existingFile: "error" }), "utf-8");
+      writeFileSync(join(inputDir, "a.txt"), "a\n", "utf-8");
+      writeFileSync(join(outputDir, "a.txt"), "old a\n", "utf-8");
+
+      await expect(
+        runGenerate({ templatePath: inputDir, outputPath: outputDir })
+      ).rejects.toThrow(KatazomeError);
+    });
+  });
+});
+
+describe("runGenerate exclude", () => {
+  test("excludes files matching exclude patterns in directory mode", async () => {
+    await withTempDir(async (dir) => {
+      const inputDir = join(dir, "src");
+      const outputDir = join(dir, "out");
+      mkdirSync(inputDir, { recursive: true });
+
+      const setting = { exclude: [".DS_Store", "*.local.*"] };
+      writeFileSync(join(inputDir, "ktzm-setting.json"), JSON.stringify(setting), "utf-8");
+      writeFileSync(join(inputDir, "hello.txt"), "hello\n", "utf-8");
+      writeFileSync(join(inputDir, ".DS_Store"), "mac junk\n", "utf-8");
+      writeFileSync(join(inputDir, "config.local.txt"), "local config\n", "utf-8");
+
+      await runGenerate({ templatePath: inputDir, outputPath: outputDir });
+
+      expect(existsSync(join(outputDir, "hello.txt"))).toBe(true);
+      expect(existsSync(join(outputDir, ".DS_Store"))).toBe(false);
+      expect(existsSync(join(outputDir, "config.local.txt"))).toBe(false);
     });
   });
 });

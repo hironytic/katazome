@@ -1,5 +1,5 @@
 import { resolve, dirname, join, basename } from "node:path";
-import { writeFileSync, statSync, existsSync } from "node:fs";
+import { writeFileSync, statSync, existsSync, rmSync } from "node:fs";
 import { loadSetting } from "../config/loader.ts";
 import { loadInput } from "../input/loader.ts";
 import { tokenize } from "../core/tokenizer.ts";
@@ -8,8 +8,9 @@ import { generateRuntimeContent } from "../runtime/content.ts";
 import { walkDirectory } from "../fs/walker.ts";
 import {
   assertNotSamePath,
-  getTagDefForExtension,
-  getExtension,
+  getTagDefForFile,
+  isExcluded,
+  askConfirmation,
   ensureDir,
   computeRuntimeImportPath,
   resolveSettingPath,
@@ -25,6 +26,7 @@ export interface TranspileOptions {
   session?: string;
   templatePath: string;
   outputPath?: string;
+  force?: boolean;
 }
 
 /**
@@ -48,6 +50,20 @@ export async function runTranspile(options: TranspileOptions): Promise<void> {
     const outputAbs = resolve(options.outputPath);
     assertNotSamePath(templateAbs, outputAbs);
 
+    // Confirm before overwriting an existing output directory.
+    if (existsSync(outputAbs)) {
+      if (!options.force) {
+        const confirmed = await askConfirmation(
+          `Output directory "${outputAbs}" already exists and will be deleted. Continue?`
+        );
+        if (!confirmed) {
+          process.stderr.write("Aborted.\n");
+          return;
+        }
+      }
+      rmSync(outputAbs, { recursive: true });
+    }
+
     // Determine runtime path: --runtime or <outputDir>/ktzm-runtime.ts
     const runtimePath = options.runtime
       ? resolve(options.runtime)
@@ -59,6 +75,7 @@ export async function runTranspile(options: TranspileOptions): Promise<void> {
     const files = walkDirectory(templateAbs);
     for (const file of files) {
       if (file.absolutePath === settingAbs) continue;
+      if (isExcluded(setting, basename(file.absolutePath))) continue;
       const outRelPath = `${file.relativePath}.ts`;
       const outAbsPath = join(outputAbs, outRelPath);
       if (outAbsPath === settingAbs) {
@@ -87,6 +104,7 @@ export async function runTranspile(options: TranspileOptions): Promise<void> {
       transpilatePath: outputAbs,
       files: files
         .filter((f) => f.absolutePath !== settingAbs)
+        .filter((f) => !isExcluded(setting, basename(f.absolutePath)))
         .map((f) => ({ relativePath: f.relativePath })),
     };
     writeSession(sessionPath, sessionData);
@@ -107,6 +125,19 @@ export async function runTranspile(options: TranspileOptions): Promise<void> {
       );
     }
     assertNotSamePath(templateAbs, outputAbs);
+
+    // Confirm before overwriting an existing output file.
+    if (existsSync(outputAbs)) {
+      if (!options.force) {
+        const confirmed = await askConfirmation(
+          `Output file "${outputAbs}" already exists. Overwrite?`
+        );
+        if (!confirmed) {
+          process.stderr.write("Aborted.\n");
+          return;
+        }
+      }
+    }
 
     // Determine runtime path: --runtime or same dir as transpiled file
     const runtimePath = options.runtime
@@ -146,14 +177,7 @@ async function transpileFile(
   setting: ReturnType<typeof loadSetting> extends Promise<infer T> ? T : never,
   displayName: string
 ): Promise<void> {
-  const ext = getExtension(templatePath);
-  if (ext === undefined) {
-    throw new KatazomeError(
-      `Cannot determine extension for file "${displayName}". Files must have an extension.`
-    );
-  }
-
-  const tagDef = getTagDefForExtension(setting, ext);
+  const tagDef = getTagDefForFile(setting, basename(templatePath));
 
   let templateContent: string;
   try {

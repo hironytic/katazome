@@ -4,13 +4,14 @@
       { "start": "/*{%", "end": "%}*/" }
     ]
   },
-  "extensions": {
-    "c": {
+  "files": [
+    {
+      "pattern": "*.c",
       "tagDefinition": {
         "code": [
           { "start": "/*{%", "end": "-%}*/" }
         ]
       }
     }
-  }
+  ]
 }
