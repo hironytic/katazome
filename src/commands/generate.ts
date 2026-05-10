@@ -8,8 +8,10 @@ import { render } from "../core/renderer.ts";
 import { walkDirectory } from "../fs/walker.ts";
 import {
   assertNotSamePath,
-  getTagDefForExtension,
-  getExtension,
+  getTagDefForFile,
+  getExistingFileBehavior,
+  isExcluded,
+  askExistingFileAction,
   ensureDir,
   resolveSettingPath,
 } from "./utils.ts";
@@ -41,6 +43,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
     const files = walkDirectory(templateAbs);
     for (const file of files) {
       if (file.absolutePath === settingAbs) continue;
+      if (isExcluded(setting, basename(file.absolutePath))) continue;
       const outAbsPath = join(outputAbs, file.relativePath);
       if (outAbsPath === settingAbs) {
         throw new KatazomeError(
@@ -84,14 +87,27 @@ async function generateFile(
   inputData: unknown,
   displayName: string
 ): Promise<void> {
-  const ext = getExtension(templatePath);
-  if (ext === undefined) {
-    throw new KatazomeError(
-      `Cannot determine extension for file "${displayName}". Files must have an extension.`
-    );
-  }
+  const filename = basename(templatePath);
+  const tagDef = getTagDefForFile(setting, filename);
 
-  const tagDef = getTagDefForExtension(setting, ext);
+  const behavior = getExistingFileBehavior(setting, filename);
+  if (behavior !== "overwrite" && existsSync(outputPath)) {
+    if (behavior === "error") {
+      throw new KatazomeError(
+        `Output file already exists: "${outputPath}". Use a different existingFile setting to allow overwriting or skipping.`
+      );
+    }
+    if (behavior === "skip") return;
+    if (behavior === "prompt") {
+      const action = await askExistingFileAction(displayName);
+      if (action === "skip") return;
+      if (action === "error") {
+        throw new KatazomeError(
+          `Output file already exists: "${outputPath}".`
+        );
+      }
+    }
+  }
 
   let templateContent: string;
   try {

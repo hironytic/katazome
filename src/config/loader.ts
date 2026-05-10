@@ -1,7 +1,8 @@
 import { readAndParse } from "../utils/file-parser.ts";
 import type {
-  ExtensionConfig,
-  ExtensionTagDefinitionConfig,
+  ExistingFileBehavior,
+  FilePatternConfig,
+  FilePatternTagDefinitionConfig,
   Setting,
   TagDefinition,
   TagTypeDefinition,
@@ -25,28 +26,35 @@ function validateSetting(value: unknown, filePath: string): Setting {
 
   const obj = value as Record<string, unknown>;
 
-  warnUnknownKeys(obj, ["tagDefinition", "extensions"], filePath, "");
+  warnUnknownKeys(obj, ["tagDefinition", "existingFile", "exclude", "files"], filePath, "");
 
   const tagDefinition = validateCommonTagDefinition(obj["tagDefinition"], filePath);
-  const extensions = validateExtensionsMap(obj["extensions"], filePath);
+  const existingFile = validateExistingFileBehavior(obj["existingFile"], filePath, `existingFile`);
+  const exclude = validateExcludeArray(obj["exclude"], filePath);
+  const files = validateFilesArray(obj["files"], filePath);
 
-  // Duplicate start string check for each extension's resolved definition.
-  for (const [ext, extConfig] of Object.entries(extensions)) {
-    const extTagDef = extConfig.tagDefinition;
-    checkDuplicateStarts(extTagDef, ext, filePath);
+  // Duplicate start string check for each file pattern's resolved definition.
+  for (const [i, fileConfig] of files.entries()) {
+    const fileTagDef = fileConfig.tagDefinition;
+    checkDuplicateStarts(fileTagDef, i, fileConfig.pattern, filePath);
 
-    if (extTagDef.inherit) {
-      // Also check the combined (common + extension) definition.
+    if (fileTagDef.inherit) {
+      // Also check the combined (common + file pattern) definition.
       const combined: TagDefinition = {
-        code: [...tagDefinition.code, ...extTagDef.code],
-        value: [...tagDefinition.value, ...extTagDef.value],
-        comment: [...tagDefinition.comment, ...extTagDef.comment],
+        code: [...tagDefinition.code, ...fileTagDef.code],
+        value: [...tagDefinition.value, ...fileTagDef.value],
+        comment: [...tagDefinition.comment, ...fileTagDef.comment],
       };
-      checkDuplicateStarts(combined, ext, filePath, "(combined with common tagDefinition)");
+      checkDuplicateStarts(combined, i, fileConfig.pattern, filePath, "(combined with common tagDefinition)");
     }
   }
 
-  return { tagDefinition, extensions };
+  return {
+    tagDefinition,
+    ...(existingFile !== undefined ? { existingFile } : {}),
+    exclude,
+    files,
+  };
 }
 
 function validateCommonTagDefinition(value: unknown, filePath: string): TagDefinition {
@@ -69,70 +77,105 @@ function validateCommonTagDefinition(value: unknown, filePath: string): TagDefin
     comment: parseTagTypeDefinitions(obj["comment"], filePath, `tagDefinition.comment`),
   };
 
-  checkDuplicateStarts(result, undefined, filePath);
+  checkDuplicateStarts(result, undefined, undefined, filePath);
 
   return result;
 }
 
-function validateExtensionsMap(
+function validateExistingFileBehavior(
   value: unknown,
-  filePath: string
-): Record<string, ExtensionConfig> {
-  if (value === undefined) {
-    return {};
-  }
+  filePath: string,
+  location: string
+): ExistingFileBehavior | undefined {
+  if (value === undefined) return undefined;
 
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+  if (value !== "error" && value !== "overwrite" && value !== "skip" && value !== "prompt") {
     throw new KatazomeError(
-      `Setting file "${filePath}": "extensions" must be an object.`
+      `Setting file "${filePath}": ${location} must be "error", "overwrite", "skip", or "prompt".`
+    );
+  }
+  return value;
+}
+
+function validateExcludeArray(value: unknown, filePath: string): string[] {
+  if (value === undefined) return [];
+
+  if (!Array.isArray(value)) {
+    throw new KatazomeError(
+      `Setting file "${filePath}": "exclude" must be an array.`
     );
   }
 
-  const obj = value as Record<string, unknown>;
-  const result: Record<string, ExtensionConfig> = {};
-
-  for (const [rawKey, extValue] of Object.entries(obj)) {
-    const key = rawKey.toLowerCase();
-    if (key in result) {
+  return value.map((item, i) => {
+    if (typeof item !== "string" || item.length === 0) {
       throw new KatazomeError(
-        `Setting file "${filePath}": duplicate extension key "${key}" (after lowercasing).`
+        `Setting file "${filePath}": exclude[${i}] must be a non-empty string.`
       );
     }
-    result[key] = validateExtensionConfig(extValue, key, filePath);
-  }
-
-  return result;
+    return item;
+  });
 }
 
-function validateExtensionConfig(
+function validateFilesArray(
   value: unknown,
-  ext: string,
   filePath: string
-): ExtensionConfig {
+): FilePatternConfig[] {
+  if (value === undefined) {
+    return [];
+  }
+
+  if (!Array.isArray(value)) {
+    throw new KatazomeError(
+      `Setting file "${filePath}": "files" must be an array.`
+    );
+  }
+
+  return value.map((item, i) => validateFilePatternConfig(item, i, filePath));
+}
+
+function validateFilePatternConfig(
+  value: unknown,
+  index: number,
+  filePath: string
+): FilePatternConfig {
+  const location = `files[${index}]`;
+
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     throw new KatazomeError(
-      `Setting file "${filePath}": extensions["${ext}"] must be an object.`
+      `Setting file "${filePath}": ${location} must be an object.`
     );
   }
 
   const obj = value as Record<string, unknown>;
-  warnUnknownKeys(obj, ["tagDefinition"], filePath, `extensions["${ext}"]`);
+  warnUnknownKeys(obj, ["pattern", "tagDefinition", "existingFile"], filePath, location);
 
+  if (typeof obj["pattern"] !== "string" || obj["pattern"].length === 0) {
+    throw new KatazomeError(
+      `Setting file "${filePath}": ${location}.pattern must be a non-empty string.`
+    );
+  }
+  const pattern = obj["pattern"];
+
+  const existingFile = validateExistingFileBehavior(obj["existingFile"], filePath, `${location}.existingFile`);
   return {
-    tagDefinition: validateExtensionTagDefinitionConfig(
+    pattern,
+    tagDefinition: validateFilePatternTagDefinitionConfig(
       obj["tagDefinition"],
-      ext,
+      index,
+      pattern,
       filePath
     ),
+    ...(existingFile !== undefined ? { existingFile } : {}),
   };
 }
 
-function validateExtensionTagDefinitionConfig(
+function validateFilePatternTagDefinitionConfig(
   value: unknown,
-  ext: string,
+  index: number,
+  pattern: string,
   filePath: string
-): ExtensionTagDefinitionConfig {
-  const location = `extensions["${ext}"].tagDefinition`;
+): FilePatternTagDefinitionConfig {
+  const location = `files[${index}].tagDefinition`;
 
   if (value === undefined) {
     return { inherit: true, code: [], value: [], comment: [] };
@@ -234,18 +277,20 @@ function validateTagTypeDefinition(
  * Throws KatazomeError on the first duplicate found.
  *
  * @param tagDef   The tag definition to check.
- * @param ext      Extension name for error messages, or undefined for the common definition.
+ * @param index    Index into the files array, or undefined for the common definition.
+ * @param pattern  Pattern string for error messages, or undefined for the common definition.
  * @param filePath Setting file path for error messages.
  * @param note     Optional suffix appended to the error message location.
  */
 function checkDuplicateStarts(
   tagDef: TagDefinition,
-  ext: string | undefined,
+  index: number | undefined,
+  pattern: string | undefined,
   filePath: string,
   note = ""
 ): void {
-  const prefix = ext !== undefined
-    ? `extensions["${ext}"].tagDefinition`
+  const prefix = index !== undefined
+    ? `files[${index}].tagDefinition`
     : `tagDefinition`;
   const locationSuffix = note ? ` ${note}` : "";
 

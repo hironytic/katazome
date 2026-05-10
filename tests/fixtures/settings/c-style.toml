@@ -11,14 +11,20 @@ trim = "both"
 start = "/*{#"
 end = "#}*/"
 
-[[extensions.c.tagDefinition.value]]
+[[files]]
+pattern = "*.c"
+
+[[files.tagDefinition.value]]
 start = "_V_"
 end = "_"
 
-[[extensions.c.tagDefinition.value]]
+[[files.tagDefinition.value]]
 start = "_V(\""
 end = "\")"
 
-[[extensions.ts.tagDefinition.value]]
+[[files]]
+pattern = "*.ts"
+
+[[files.tagDefinition.value]]
 start = "_V_"
 end = "_"

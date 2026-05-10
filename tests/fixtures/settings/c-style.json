@@ -8,8 +8,9 @@
       { "start": "/*{#", "end": "#}*/" }
     ]
   },
-  "extensions": {
-    "c": {
+  "files": [
+    {
+      "pattern": "*.c",
       "tagDefinition": {
         "value": [
           { "start": "_V_", "end": "_" },
@@ -17,12 +18,13 @@
         ]
       }
     },
-    "ts": {
+    {
+      "pattern": "*.ts",
       "tagDefinition": {
         "value": [
           { "start": "_V_", "end": "_" }
         ]
       }
     }
-  }
+  ]
 }

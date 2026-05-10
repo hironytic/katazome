@@ -7,14 +7,15 @@ import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
 
 const settingJson = JSON.stringify({
-  extensions: {
-    txt: {
+  files: [
+    {
+      pattern: "*.txt",
       tagDefinition: {
         code: [{ start: "/*{%", end: "%}*/" }],
         value: [{ start: "_V_", end: "_" }],
       },
     },
-  },
+  ],
 });
 
 function withTempDir(fn: (dir: string) => Promise<void>): Promise<void> {
@@ -31,7 +32,7 @@ describe("runTranspile without --setting", () => {
       writeFileSync(join(dir, "ktzm-setting.json"), settingJson, "utf-8");
       writeFileSync(templatePath, "hello world\n", "utf-8");
 
-      await runTranspile({ templatePath });
+      await runTranspile({ templatePath, force: true });
 
       expect(existsSync(join(dir, "template.txt.ts"))).toBe(true);
     });
@@ -57,7 +58,7 @@ describe("runTranspile setting file handling", () => {
       writeFileSync(join(inputDir, "ktzm-setting.json"), settingJson, "utf-8");
       writeFileSync(join(inputDir, "hello.txt"), "hello\n", "utf-8");
 
-      await runTranspile({ templatePath: inputDir, outputPath: outputDir });
+      await runTranspile({ templatePath: inputDir, outputPath: outputDir, force: true });
 
       // Setting file is not copied to the output directory
       expect(existsSync(join(outputDir, "ktzm-setting.json"))).toBe(false);
@@ -101,7 +102,7 @@ describe("runTranspile without --input", () => {
       writeFileSync(settingPath, settingJson, "utf-8");
       writeFileSync(templatePath, "hello world\n", "utf-8");
 
-      await runTranspile({ setting: settingPath, templatePath });
+      await runTranspile({ setting: settingPath, templatePath, force: true });
 
       expect(existsSync(join(dir, "template.txt.ts"))).toBe(true);
       expect(existsSync(join(dir, "ktzm-runtime.ts"))).toBe(true);
@@ -116,10 +117,70 @@ describe("runTranspile without --input", () => {
       writeFileSync(settingPath, settingJson, "utf-8");
       writeFileSync(templatePath, "hello\n", "utf-8");
 
-      await runTranspile({ setting: settingPath, templatePath });
+      await runTranspile({ setting: settingPath, templatePath, force: true });
 
       const runtimeContent = await Bun.file(join(dir, "ktzm-runtime.ts")).text();
       expect(runtimeContent).toContain("const inputData: unknown = {}");
+    });
+  });
+});
+
+describe("runTranspile existing output handling", () => {
+  test("overwrites existing single output file when --force is given", async () => {
+    await withTempDir(async (dir) => {
+      const settingPath = join(dir, "setting.json");
+      const templatePath = join(dir, "template.txt");
+      const outputPath = join(dir, "template.txt.ts");
+
+      writeFileSync(settingPath, settingJson, "utf-8");
+      writeFileSync(templatePath, "hello\n", "utf-8");
+      writeFileSync(outputPath, "old transpilate\n", "utf-8");
+
+      await runTranspile({ setting: settingPath, templatePath, force: true });
+
+      const content = await Bun.file(outputPath).text();
+      expect(content).not.toBe("old transpilate\n");
+    });
+  });
+
+  test("replaces existing output directory when --force is given", async () => {
+    await withTempDir(async (dir) => {
+      const inputDir = join(dir, "src");
+      const outputDir = join(dir, "out");
+      mkdirSync(inputDir, { recursive: true });
+      mkdirSync(outputDir, { recursive: true });
+
+      writeFileSync(join(inputDir, "ktzm-setting.json"), settingJson, "utf-8");
+      writeFileSync(join(inputDir, "hello.txt"), "hello\n", "utf-8");
+      // Put a stale file in the output directory that should be removed
+      writeFileSync(join(outputDir, "stale.txt.ts"), "stale\n", "utf-8");
+
+      await runTranspile({ templatePath: inputDir, outputPath: outputDir, force: true });
+
+      expect(existsSync(join(outputDir, "hello.txt.ts"))).toBe(true);
+      expect(existsSync(join(outputDir, "stale.txt.ts"))).toBe(false);
+    });
+  });
+});
+
+describe("runTranspile exclude", () => {
+  test("excludes files matching exclude patterns in directory mode", async () => {
+    await withTempDir(async (dir) => {
+      const inputDir = join(dir, "src");
+      const outputDir = join(dir, "out");
+      mkdirSync(inputDir, { recursive: true });
+
+      const setting = { exclude: [".DS_Store", "*.local.*"] };
+      writeFileSync(join(inputDir, "ktzm-setting.json"), JSON.stringify(setting), "utf-8");
+      writeFileSync(join(inputDir, "hello.txt"), "hello\n", "utf-8");
+      writeFileSync(join(inputDir, ".DS_Store"), "mac junk\n", "utf-8");
+      writeFileSync(join(inputDir, "config.local.txt"), "local config\n", "utf-8");
+
+      await runTranspile({ templatePath: inputDir, outputPath: outputDir, force: true });
+
+      expect(existsSync(join(outputDir, "hello.txt.ts"))).toBe(true);
+      expect(existsSync(join(outputDir, ".DS_Store.ts"))).toBe(false);
+      expect(existsSync(join(outputDir, "config.local.txt.ts"))).toBe(false);
     });
   });
 });

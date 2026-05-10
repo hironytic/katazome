@@ -35,23 +35,33 @@ export interface TagDefinition {
   comment: TagTypeDefinition[];
 }
 
-/** Extension-specific tag definition config parsed from the setting file. */
-export interface ExtensionTagDefinitionConfig extends TagDefinition {
+/** How to handle an output file that already exists. */
+export type ExistingFileBehavior = "error" | "overwrite" | "skip" | "prompt";
+
+/** File-pattern-specific tag definition config parsed from the setting file. */
+export interface FilePatternTagDefinitionConfig extends TagDefinition {
   /** Whether to inherit (and append to) the common tag definition. Default: true. */
   inherit: boolean;
 }
 
-/** Extension-specific settings (after loading — all fields filled in with defaults). */
-export interface ExtensionConfig {
-  tagDefinition: ExtensionTagDefinitionConfig;
+/** File-pattern-specific settings (after loading — all fields filled in with defaults). */
+export interface FilePatternConfig {
+  /** Filename pattern (supports * wildcard; matched against the filename only, not the path). */
+  pattern: string;
+  tagDefinition: FilePatternTagDefinitionConfig;
+  existingFile?: ExistingFileBehavior;
 }
 
 /** The parsed setting file structure. */
 export interface Setting {
-  /** Common tag definitions applied to all extensions (may have empty arrays). */
+  /** Common tag definitions applied to all files (may have empty arrays). */
   tagDefinition: TagDefinition;
-  /** Extension-specific settings. Keys are normalized to lowercase. */
-  extensions: Record<string, ExtensionConfig>;
+  /** Default behavior when an output file already exists. */
+  existingFile?: ExistingFileBehavior;
+  /** Filename patterns to exclude from processing entirely. */
+  exclude: string[];
+  /** File-pattern-specific settings. Matched in order; exact patterns take priority over wildcards. */
+  files: FilePatternConfig[];
 }
 
 // ---------------------------------------------------------------------------

@@ -42,12 +42,13 @@ program
   .option("--input <file>", "Path to the input data file (JSON, JSON5, YAML, or TOML)")
   .option("--runtime <file>", "Output path for the runtime file (default: ktzm-runtime.ts next to the transpiled file)")
   .option("--session <file>", "Output path for the session file (default: ktzm-session.json next to the transpiled file)")
+  .option("--force", "Skip confirmation prompt when the output path already exists")
   .argument("<template-file>", "Template file or directory")
   .argument("[output-transpiled-file]", "Output transpiled file or directory (default: <template-file>.ts)")
   .action(async (
     templateFile: string,
     outputFile: string | undefined,
-    options: { setting?: string; input?: string; runtime?: string; session?: string }
+    options: { setting?: string; input?: string; runtime?: string; session?: string; force?: boolean }
   ) => {
     await runTranspile({
       ...(options.setting !== undefined ? { setting: options.setting } : {}),
@@ -56,6 +57,7 @@ program
       ...(options.session !== undefined ? { session: options.session } : {}),
       templatePath: templateFile,
       ...(outputFile !== undefined ? { outputPath: outputFile } : {}),
+      ...(options.force ? { force: true } : {}),
     });
   });
 
