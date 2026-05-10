@@ -8,11 +8,19 @@ import { KatazomeError } from "../errors.ts";
  * @param runtimeImportPath Relative path from the transpilate file to the runtime file.
  * @returns                 The full transpilate source code.
  */
-export function transpileTokens(tokens: Token[], runtimeImportPath: string): string {
+export function transpileTokens(
+  tokens: Token[],
+  runtimeImportPath: string,
+  userImports: Array<{ path: string; as: string }> = []
+): string {
   const parts: string[] = [];
 
-  // Prepend the fixed import header.
-  parts.push(`/*ktzm:appended{*/\nimport ktzm from "${runtimeImportPath}";\n/*}ktzm*/\n\n`);
+  let header = `/*ktzm:appended{*/\nimport ktzm from "${runtimeImportPath}";\n`;
+  for (const imp of userImports) {
+    header += `import * as ${imp.as} from "${imp.path}";\n`;
+  }
+  header += `/*}ktzm*/\n\n`;
+  parts.push(header);
 
   // Process each token, applying trim logic for adjacent tag/literal pairs.
   for (let i = 0; i < tokens.length; i++) {

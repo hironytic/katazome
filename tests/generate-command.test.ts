@@ -292,3 +292,32 @@ describe("runGenerate exclude", () => {
     });
   });
 });
+
+describe("runGenerate imports", () => {
+  test("user import is callable from a value tag", async () => {
+    await withTempDir(async (dir) => {
+      const helperContent = `export function greet(name: string) { return "Hello, " + name; }`;
+      writeFileSync(join(dir, "helpers.ts"), helperContent, "utf-8");
+
+      const setting = {
+        imports: { paths: [{ path: "./helpers.ts", as: "helpers" }] },
+        files: [
+          {
+            pattern: "*.txt",
+            tagDefinition: {
+              value: [{ start: "_V_", end: "_" }],
+            },
+          },
+        ],
+      };
+      const templatePath = join(dir, "template.txt");
+      const outputPath = join(dir, "output.txt");
+      writeFileSync(join(dir, "ktzm-setting.json"), JSON.stringify(setting), "utf-8");
+      writeFileSync(templatePath, "_V_helpers.greet('world')_\n", "utf-8");
+
+      await runGenerate({ templatePath, outputPath });
+
+      expect(await Bun.file(outputPath).text()).toBe("Hello, world\n");
+    });
+  });
+});

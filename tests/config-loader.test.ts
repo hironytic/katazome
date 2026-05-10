@@ -200,6 +200,179 @@ describe("loadSetting", () => {
   });
 
   // -------------------------------------------------------------------------
+  // imports
+  // -------------------------------------------------------------------------
+
+  test("imports is undefined when omitted", async () => {
+    const setting = await loadSetting(`${fixturesDir}c-style.json`);
+    expect(setting.imports).toBeUndefined();
+  });
+
+  test("loads root-level imports", async () => {
+    const settingJson = JSON.stringify({
+      imports: {
+        paths: [
+          { path: "./helpers.ts", as: "helpers" },
+          { path: "../shared/utils.ts", as: "myUtils" },
+        ],
+      },
+    });
+    const tmpPath = `${import.meta.dir}/tmp-root-imports.json`;
+    await Bun.write(tmpPath, settingJson);
+    try {
+      const setting = await loadSetting(tmpPath);
+      expect(setting.imports?.paths).toHaveLength(2);
+      expect(setting.imports?.paths[0]).toEqual({ path: "./helpers.ts", as: "helpers" });
+      expect(setting.imports?.paths[1]).toEqual({ path: "../shared/utils.ts", as: "myUtils" });
+    } finally {
+      await Bun.spawn(["rm", "-f", tmpPath]).exited;
+    }
+  });
+
+  test("root imports with empty paths array", async () => {
+    const settingJson = JSON.stringify({ imports: { paths: [] } });
+    const tmpPath = `${import.meta.dir}/tmp-root-imports-empty.json`;
+    await Bun.write(tmpPath, settingJson);
+    try {
+      const setting = await loadSetting(tmpPath);
+      expect(setting.imports?.paths).toHaveLength(0);
+    } finally {
+      await Bun.spawn(["rm", "-f", tmpPath]).exited;
+    }
+  });
+
+  test("loads file-pattern-level imports with inherit: true", async () => {
+    const settingJson = JSON.stringify({
+      files: [
+        {
+          pattern: "*.c",
+          imports: {
+            inherit: true,
+            paths: [{ path: "./c-helpers.ts", as: "cHelpers" }],
+          },
+        },
+      ],
+    });
+    const tmpPath = `${import.meta.dir}/tmp-file-imports-inherit-true.json`;
+    await Bun.write(tmpPath, settingJson);
+    try {
+      const setting = await loadSetting(tmpPath);
+      expect(setting.files[0]?.imports?.inherit).toBe(true);
+      expect(setting.files[0]?.imports?.paths).toHaveLength(1);
+      expect(setting.files[0]?.imports?.paths[0]).toEqual({ path: "./c-helpers.ts", as: "cHelpers" });
+    } finally {
+      await Bun.spawn(["rm", "-f", tmpPath]).exited;
+    }
+  });
+
+  test("file-pattern imports: inherit defaults to true when omitted", async () => {
+    const settingJson = JSON.stringify({
+      files: [
+        {
+          pattern: "*.c",
+          imports: { paths: [{ path: "./c-helpers.ts", as: "cHelpers" }] },
+        },
+      ],
+    });
+    const tmpPath = `${import.meta.dir}/tmp-file-imports-inherit-default.json`;
+    await Bun.write(tmpPath, settingJson);
+    try {
+      const setting = await loadSetting(tmpPath);
+      expect(setting.files[0]?.imports?.inherit).toBe(true);
+    } finally {
+      await Bun.spawn(["rm", "-f", tmpPath]).exited;
+    }
+  });
+
+  test("file-pattern imports: inherit: false is preserved", async () => {
+    const settingJson = JSON.stringify({
+      files: [
+        {
+          pattern: "*.c",
+          imports: {
+            inherit: false,
+            paths: [{ path: "./c-helpers.ts", as: "cHelpers" }],
+          },
+        },
+      ],
+    });
+    const tmpPath = `${import.meta.dir}/tmp-file-imports-inherit-false.json`;
+    await Bun.write(tmpPath, settingJson);
+    try {
+      const setting = await loadSetting(tmpPath);
+      expect(setting.files[0]?.imports?.inherit).toBe(false);
+    } finally {
+      await Bun.spawn(["rm", "-f", tmpPath]).exited;
+    }
+  });
+
+  test("file-pattern imports is undefined when omitted", async () => {
+    const settingJson = JSON.stringify({
+      files: [{ pattern: "*.c" }],
+    });
+    const tmpPath = `${import.meta.dir}/tmp-file-imports-absent.json`;
+    await Bun.write(tmpPath, settingJson);
+    try {
+      const setting = await loadSetting(tmpPath);
+      expect(setting.files[0]?.imports).toBeUndefined();
+    } finally {
+      await Bun.spawn(["rm", "-f", tmpPath]).exited;
+    }
+  });
+
+  test("throws when as is 'ktzm'", async () => {
+    const settingJson = JSON.stringify({
+      imports: { paths: [{ path: "./helpers.ts", as: "ktzm" }] },
+    });
+    const tmpPath = `${import.meta.dir}/tmp-imports-reserved-as.json`;
+    await Bun.write(tmpPath, settingJson);
+    try {
+      await expect(loadSetting(tmpPath)).rejects.toThrow(KatazomeError);
+    } finally {
+      await Bun.spawn(["rm", "-f", tmpPath]).exited;
+    }
+  });
+
+  test("throws when import entry path is missing", async () => {
+    const settingJson = JSON.stringify({
+      imports: { paths: [{ as: "helpers" }] },
+    });
+    const tmpPath = `${import.meta.dir}/tmp-imports-no-path.json`;
+    await Bun.write(tmpPath, settingJson);
+    try {
+      await expect(loadSetting(tmpPath)).rejects.toThrow(KatazomeError);
+    } finally {
+      await Bun.spawn(["rm", "-f", tmpPath]).exited;
+    }
+  });
+
+  test("throws when import entry as is missing", async () => {
+    const settingJson = JSON.stringify({
+      imports: { paths: [{ path: "./helpers.ts" }] },
+    });
+    const tmpPath = `${import.meta.dir}/tmp-imports-no-as.json`;
+    await Bun.write(tmpPath, settingJson);
+    try {
+      await expect(loadSetting(tmpPath)).rejects.toThrow(KatazomeError);
+    } finally {
+      await Bun.spawn(["rm", "-f", tmpPath]).exited;
+    }
+  });
+
+  test("throws when root imports is not an object", async () => {
+    const settingJson = JSON.stringify({
+      imports: [{ path: "./helpers.ts", as: "helpers" }],
+    });
+    const tmpPath = `${import.meta.dir}/tmp-imports-array.json`;
+    await Bun.write(tmpPath, settingJson);
+    try {
+      await expect(loadSetting(tmpPath)).rejects.toThrow(KatazomeError);
+    } finally {
+      await Bun.spawn(["rm", "-f", tmpPath]).exited;
+    }
+  });
+
+  // -------------------------------------------------------------------------
   // Duplicate start string detection
   // -------------------------------------------------------------------------
 

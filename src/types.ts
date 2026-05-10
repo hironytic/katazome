@@ -38,6 +38,26 @@ export interface TagDefinition {
 /** How to handle an output file that already exists. */
 export type ExistingFileBehavior = "error" | "overwrite" | "skip" | "prompt";
 
+/** A single user-defined import entry listed in the setting file. */
+export interface ImportEntry {
+  /** Path to the TypeScript file, relative to the setting file's directory. */
+  path: string;
+  /** Namespace import binding name used in the transpilate (e.g. `import * as <as> from ...`). */
+  as: string;
+}
+
+/** Root-level imports configuration. */
+export interface RootImportsConfig {
+  paths: ImportEntry[];
+}
+
+/** File-pattern-level imports configuration. */
+export interface FilePatternImportsConfig {
+  /** Whether to prepend root-level imports. Default: true. */
+  inherit: boolean;
+  paths: ImportEntry[];
+}
+
 /** File-pattern-specific tag definition config parsed from the setting file. */
 export interface FilePatternTagDefinitionConfig extends TagDefinition {
   /** Whether to inherit (and append to) the common tag definition. Default: true. */
@@ -50,6 +70,7 @@ export interface FilePatternConfig {
   pattern: string;
   tagDefinition: FilePatternTagDefinitionConfig;
   existingFile?: ExistingFileBehavior;
+  imports?: FilePatternImportsConfig;
 }
 
 /** The parsed setting file structure. */
@@ -60,6 +81,8 @@ export interface Setting {
   existingFile?: ExistingFileBehavior;
   /** Filename patterns to exclude from processing entirely. */
   exclude: string[];
+  /** TypeScript files to import in every transpilate. Undefined means no imports. */
+  imports?: RootImportsConfig;
   /** File-pattern-specific settings. Matched in order; exact patterns take priority over wildcards. */
   files: FilePatternConfig[];
 }

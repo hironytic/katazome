@@ -2,7 +2,7 @@ import { resolve, dirname, relative, join } from "node:path";
 import { mkdirSync, existsSync, statSync } from "node:fs";
 import { createInterface } from "node:readline";
 import { KatazomeError } from "../errors.ts";
-import type { ExistingFileBehavior, FilePatternConfig, TagDefinition, Setting } from "../types.ts";
+import type { ExistingFileBehavior, FilePatternConfig, ImportEntry, TagDefinition, Setting } from "../types.ts";
 
 const SETTING_EXTS = ["json", "json5", "yaml", "toml"] as const;
 const SETTING_BASE = "ktzm-setting";
@@ -154,6 +154,32 @@ export function computeRuntimeImportPath(
   // Ensure the path starts with "./"
   if (rel.startsWith("..") || rel.startsWith("/")) return rel;
   return `./${rel}`;
+}
+
+/**
+ * Resolves the effective import entries for the given filename, with absolute paths.
+ * Applies root-level imports and file-pattern-level imports according to the inherit flag.
+ */
+export function resolveImports(
+  setting: Setting,
+  filename: string,
+  settingDir: string
+): Array<{ path: string; as: string }> {
+  const toAbs = (e: ImportEntry) => ({
+    path: resolve(settingDir, e.path),
+    as: e.as,
+  });
+
+  const rootImports = (setting.imports?.paths ?? []).map(toAbs);
+
+  const fileConfig = findFilePatternConfig(setting, filename);
+  if (fileConfig?.imports === undefined) return rootImports;
+
+  const fileImports = fileConfig.imports.paths.map(toAbs);
+
+  return fileConfig.imports.inherit
+    ? [...rootImports, ...fileImports]
+    : fileImports;
 }
 
 /**
