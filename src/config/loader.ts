@@ -2,7 +2,10 @@ import { readAndParse } from "../utils/file-parser.ts";
 import type {
   ExistingFileBehavior,
   FilePatternConfig,
+  FilePatternImportsConfig,
   FilePatternTagDefinitionConfig,
+  ImportEntry,
+  RootImportsConfig,
   Setting,
   TagDefinition,
   TagTypeDefinition,
@@ -26,11 +29,12 @@ function validateSetting(value: unknown, filePath: string): Setting {
 
   const obj = value as Record<string, unknown>;
 
-  warnUnknownKeys(obj, ["tagDefinition", "existingFile", "exclude", "files"], filePath, "");
+  warnUnknownKeys(obj, ["tagDefinition", "existingFile", "exclude", "imports", "files"], filePath, "");
 
   const tagDefinition = validateCommonTagDefinition(obj["tagDefinition"], filePath);
   const existingFile = validateExistingFileBehavior(obj["existingFile"], filePath, `existingFile`);
   const exclude = validateExcludeArray(obj["exclude"], filePath);
+  const imports = validateRootImportsConfig(obj["imports"], filePath);
   const files = validateFilesArray(obj["files"], filePath);
 
   // Duplicate start string check for each file pattern's resolved definition.
@@ -53,6 +57,7 @@ function validateSetting(value: unknown, filePath: string): Setting {
     tagDefinition,
     ...(existingFile !== undefined ? { existingFile } : {}),
     exclude,
+    ...(imports !== undefined ? { imports } : {}),
     files,
   };
 }
@@ -116,6 +121,109 @@ function validateExcludeArray(value: unknown, filePath: string): string[] {
   });
 }
 
+function validateRootImportsConfig(
+  value: unknown,
+  filePath: string
+): RootImportsConfig | undefined {
+  if (value === undefined) return undefined;
+
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new KatazomeError(
+      `Setting file "${filePath}": "imports" must be an object.`
+    );
+  }
+
+  const obj = value as Record<string, unknown>;
+  warnUnknownKeys(obj, ["paths"], filePath, "imports");
+
+  return { paths: validateImportPaths(obj["paths"], filePath, "imports.paths") };
+}
+
+function validateFilePatternImportsConfig(
+  value: unknown,
+  index: number,
+  filePath: string
+): FilePatternImportsConfig | undefined {
+  if (value === undefined) return undefined;
+
+  const location = `files[${index}].imports`;
+
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new KatazomeError(
+      `Setting file "${filePath}": "${location}" must be an object.`
+    );
+  }
+
+  const obj = value as Record<string, unknown>;
+  warnUnknownKeys(obj, ["inherit", "paths"], filePath, location);
+
+  let inherit = true;
+  if ("inherit" in obj) {
+    if (typeof obj["inherit"] !== "boolean") {
+      throw new KatazomeError(
+        `Setting file "${filePath}": ${location}.inherit must be a boolean.`
+      );
+    }
+    inherit = obj["inherit"];
+  }
+
+  return {
+    inherit,
+    paths: validateImportPaths(obj["paths"], filePath, `${location}.paths`),
+  };
+}
+
+function validateImportPaths(
+  value: unknown,
+  filePath: string,
+  location: string
+): ImportEntry[] {
+  if (value === undefined) return [];
+
+  if (!Array.isArray(value)) {
+    throw new KatazomeError(
+      `Setting file "${filePath}": "${location}" must be an array.`
+    );
+  }
+
+  return value.map((item, i) => validateImportEntry(item, filePath, `${location}[${i}]`));
+}
+
+function validateImportEntry(
+  value: unknown,
+  filePath: string,
+  location: string
+): ImportEntry {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new KatazomeError(
+      `Setting file "${filePath}": ${location} must be an object.`
+    );
+  }
+
+  const obj = value as Record<string, unknown>;
+  warnUnknownKeys(obj, ["path", "as"], filePath, location);
+
+  if (typeof obj["path"] !== "string" || obj["path"].length === 0) {
+    throw new KatazomeError(
+      `Setting file "${filePath}": ${location}.path must be a non-empty string.`
+    );
+  }
+
+  if (typeof obj["as"] !== "string" || obj["as"].length === 0) {
+    throw new KatazomeError(
+      `Setting file "${filePath}": ${location}.as must be a non-empty string.`
+    );
+  }
+
+  if (obj["as"] === "ktzm") {
+    throw new KatazomeError(
+      `Setting file "${filePath}": ${location}.as must not be "ktzm" (reserved by the runtime).`
+    );
+  }
+
+  return { path: obj["path"], as: obj["as"] };
+}
+
 function validateFilesArray(
   value: unknown,
   filePath: string
@@ -147,7 +255,7 @@ function validateFilePatternConfig(
   }
 
   const obj = value as Record<string, unknown>;
-  warnUnknownKeys(obj, ["pattern", "tagDefinition", "existingFile"], filePath, location);
+  warnUnknownKeys(obj, ["pattern", "tagDefinition", "existingFile", "imports"], filePath, location);
 
   if (typeof obj["pattern"] !== "string" || obj["pattern"].length === 0) {
     throw new KatazomeError(
@@ -157,6 +265,7 @@ function validateFilePatternConfig(
   const pattern = obj["pattern"];
 
   const existingFile = validateExistingFileBehavior(obj["existingFile"], filePath, `${location}.existingFile`);
+  const imports = validateFilePatternImportsConfig(obj["imports"], index, filePath);
   return {
     pattern,
     tagDefinition: validateFilePatternTagDefinitionConfig(
@@ -166,6 +275,7 @@ function validateFilePatternConfig(
       filePath
     ),
     ...(existingFile !== undefined ? { existingFile } : {}),
+    ...(imports !== undefined ? { imports } : {}),
   };
 }
 

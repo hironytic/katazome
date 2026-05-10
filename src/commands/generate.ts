@@ -1,4 +1,4 @@
-import { resolve, join, basename } from "node:path";
+import { resolve, join, basename, dirname } from "node:path";
 import { statSync, existsSync } from "node:fs";
 import { loadSetting } from "../config/loader.ts";
 import { loadInput } from "../input/loader.ts";
@@ -13,6 +13,7 @@ import {
   isExcluded,
   askExistingFileAction,
   ensureDir,
+  resolveImports,
   resolveSettingPath,
 } from "./utils.ts";
 import { KatazomeError } from "../errors.ts";
@@ -34,6 +35,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
 
   const templateAbs = resolve(options.templatePath);
   const settingAbs = resolve(settingPath);
+  const settingDir = dirname(settingAbs);
   const outputAbs = resolve(options.outputPath);
   const isDirectory = existsSync(templateAbs) && statSync(templateAbs).isDirectory();
 
@@ -56,7 +58,8 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
         outAbsPath,
         setting,
         inputData,
-        file.relativePath
+        file.relativePath,
+        settingDir,
       );
     }
   } else {
@@ -75,7 +78,8 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
       outputAbs,
       setting,
       inputData,
-      basename(options.templatePath)
+      basename(options.templatePath),
+      settingDir,
     );
   }
 }
@@ -85,7 +89,8 @@ async function generateFile(
   outputPath: string,
   setting: ReturnType<typeof loadSetting> extends Promise<infer T> ? T : never,
   inputData: unknown,
-  displayName: string
+  displayName: string,
+  settingDir: string,
 ): Promise<void> {
   const filename = basename(templatePath);
   const tagDef = getTagDefForFile(setting, filename);
@@ -117,8 +122,9 @@ async function generateFile(
   }
 
   const tokens = tokenize(templateContent, tagDef);
+  const userImports = resolveImports(setting, filename, settingDir);
   // For generate, the runtime import path doesn't matter (temp files in same dir).
-  const transpilate = transpileTokens(tokens, "./ktzm-runtime.ts");
+  const transpilate = transpileTokens(tokens, "./ktzm-runtime.ts", userImports);
 
   ensureDir(outputPath);
   await render(transpilate, inputData, outputPath);

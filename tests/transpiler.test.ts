@@ -121,4 +121,26 @@ describe("transpileTokens", () => {
     const result = transpileTokens(tokens, "../some/path/runtime.ts");
     expect(result).toContain('import ktzm from "../some/path/runtime.ts"');
   });
+
+  test("user imports are emitted inside the appended block", () => {
+    const tokens = tokenize("", cTagDef);
+    const result = transpileTokens(tokens, RUNTIME, [
+      { path: "/abs/path/helpers.ts", as: "helpers" },
+      { path: "/abs/path/utils.ts", as: "myUtils" },
+    ]);
+    expect(result).toContain('import * as helpers from "/abs/path/helpers.ts"');
+    expect(result).toContain('import * as myUtils from "/abs/path/utils.ts"');
+    const appendedStart = result.indexOf("/*ktzm:appended{*/");
+    const appendedEnd = result.indexOf("/*}ktzm*/");
+    const helpersPos = result.indexOf('import * as helpers');
+    expect(helpersPos).toBeGreaterThan(appendedStart);
+    expect(helpersPos).toBeLessThan(appendedEnd);
+  });
+
+  test("no user imports produces same output as before", () => {
+    const tokens = tokenize("hello", cTagDef);
+    const withEmpty = transpileTokens(tokens, RUNTIME, []);
+    const withDefault = transpileTokens(tokens, RUNTIME);
+    expect(withEmpty).toBe(withDefault);
+  });
 });

@@ -163,6 +163,34 @@ describe("runTranspile existing output handling", () => {
   });
 });
 
+describe("runTranspile imports", () => {
+  test("user import appears as absolute path in transpilate appended block", async () => {
+    await withTempDir(async (dir) => {
+      const helperContent = `export function greet(name: string) { return "Hello, " + name; }`;
+      writeFileSync(join(dir, "helpers.ts"), helperContent, "utf-8");
+
+      const setting = {
+        imports: { paths: [{ path: "./helpers.ts", as: "helpers" }] },
+        files: [
+          {
+            pattern: "*.txt",
+            tagDefinition: {
+              value: [{ start: "_V_", end: "_" }],
+            },
+          },
+        ],
+      };
+      writeFileSync(join(dir, "ktzm-setting.json"), JSON.stringify(setting), "utf-8");
+      writeFileSync(join(dir, "template.txt"), "_V_helpers.greet('world')_\n", "utf-8");
+
+      await runTranspile({ templatePath: join(dir, "template.txt"), force: true });
+
+      const transpilate = await Bun.file(join(dir, "template.txt.ts")).text();
+      expect(transpilate).toContain(`import * as helpers from "${join(dir, "helpers.ts")}"`);
+    });
+  });
+});
+
 describe("runTranspile exclude", () => {
   test("excludes files matching exclude patterns in directory mode", async () => {
     await withTempDir(async (dir) => {

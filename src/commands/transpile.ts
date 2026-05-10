@@ -13,6 +13,7 @@ import {
   askConfirmation,
   ensureDir,
   computeRuntimeImportPath,
+  resolveImports,
   resolveSettingPath,
 } from "./utils.ts";
 import { KatazomeError } from "../errors.ts";
@@ -39,6 +40,7 @@ export async function runTranspile(options: TranspileOptions): Promise<void> {
 
   const templateAbs = resolve(options.templatePath);
   const settingAbs = resolve(settingPath);
+  const settingDir = dirname(settingAbs);
   const isDirectory = existsSync(templateAbs) && statSync(templateAbs).isDirectory();
 
   if (isDirectory) {
@@ -89,6 +91,7 @@ export async function runTranspile(options: TranspileOptions): Promise<void> {
         outAbsPath,
         runtimePath,
         setting,
+        settingDir,
       );
     }
 
@@ -151,6 +154,7 @@ export async function runTranspile(options: TranspileOptions): Promise<void> {
       outputAbs,
       runtimePath,
       setting,
+      settingDir,
     );
 
     // Write session file after transpilation.
@@ -173,8 +177,10 @@ async function transpileFile(
   outputPath: string,
   runtimePath: string,
   setting: ReturnType<typeof loadSetting> extends Promise<infer T> ? T : never,
+  settingDir: string,
 ): Promise<void> {
-  const tagDef = getTagDefForFile(setting, basename(templatePath));
+  const filename = basename(templatePath);
+  const tagDef = getTagDefForFile(setting, filename);
 
   let templateContent: string;
   try {
@@ -185,7 +191,8 @@ async function transpileFile(
 
   const tokens = tokenize(templateContent, tagDef);
   const importPath = computeRuntimeImportPath(outputPath, runtimePath);
-  const transpilate = transpileTokens(tokens, importPath);
+  const userImports = resolveImports(setting, filename, settingDir);
+  const transpilate = transpileTokens(tokens, importPath, userImports);
 
   ensureDir(outputPath);
   writeFileSync(outputPath, transpilate, "utf-8");
