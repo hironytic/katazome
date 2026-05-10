@@ -1,4 +1,4 @@
-import { resolve, dirname, relative, join, basename } from "node:path";
+import { resolve, dirname, relative, join } from "node:path";
 import { mkdirSync, existsSync, statSync } from "node:fs";
 import { createInterface } from "node:readline";
 import { KatazomeError } from "../errors.ts";

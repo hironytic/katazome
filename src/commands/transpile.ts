@@ -89,7 +89,6 @@ export async function runTranspile(options: TranspileOptions): Promise<void> {
         outAbsPath,
         runtimePath,
         setting,
-        file.relativePath
       );
     }
 
@@ -152,7 +151,6 @@ export async function runTranspile(options: TranspileOptions): Promise<void> {
       outputAbs,
       runtimePath,
       setting,
-      basename(options.templatePath)
     );
 
     // Write session file after transpilation.
@@ -175,7 +173,6 @@ async function transpileFile(
   outputPath: string,
   runtimePath: string,
   setting: ReturnType<typeof loadSetting> extends Promise<infer T> ? T : never,
-  displayName: string
 ): Promise<void> {
   const tagDef = getTagDefForFile(setting, basename(templatePath));
 
