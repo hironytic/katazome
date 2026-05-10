@@ -1,5 +1,5 @@
 import { resolve, dirname, join, basename } from "node:path";
-import { writeFileSync, statSync, existsSync, copyFileSync } from "node:fs";
+import { writeFileSync, statSync, existsSync } from "node:fs";
 import { loadSetting } from "../config/loader.ts";
 import { loadInput } from "../input/loader.ts";
 import { tokenize } from "../core/tokenizer.ts";
@@ -15,11 +15,14 @@ import {
   resolveSettingPath,
 } from "./utils.ts";
 import { KatazomeError } from "../errors.ts";
+import { writeSession, type TranspileSession } from "../session.ts";
+import { CLI_VERSION } from "../version.ts";
 
 export interface TranspileOptions {
   setting?: string;
   input?: string;
   runtime?: string;
+  session?: string;
   templatePath: string;
   outputPath?: string;
 }
@@ -55,18 +58,7 @@ export async function runTranspile(options: TranspileOptions): Promise<void> {
 
     const files = walkDirectory(templateAbs);
     for (const file of files) {
-      if (file.absolutePath === settingAbs) {
-        // Copy the setting file as-is so that detranspile can find it later.
-        const copyDestPath = join(outputAbs, file.relativePath);
-        if (copyDestPath === settingAbs) {
-          throw new KatazomeError(
-            `Output path conflicts with the setting file: "${copyDestPath}"`
-          );
-        }
-        ensureDir(copyDestPath);
-        copyFileSync(file.absolutePath, copyDestPath);
-        continue;
-      }
+      if (file.absolutePath === settingAbs) continue;
       const outRelPath = `${file.relativePath}.ts`;
       const outAbsPath = join(outputAbs, outRelPath);
       if (outAbsPath === settingAbs) {
@@ -83,6 +75,21 @@ export async function runTranspile(options: TranspileOptions): Promise<void> {
         file.relativePath
       );
     }
+
+    // Write session file after all files are transpiled.
+    const sessionPath = options.session
+      ? resolve(options.session)
+      : join(outputAbs, "ktzm-session.json");
+    const sessionData: TranspileSession = {
+      version: CLI_VERSION,
+      settingFile: settingAbs,
+      templatePath: templateAbs,
+      transpilatePath: outputAbs,
+      files: files
+        .filter((f) => f.absolutePath !== settingAbs)
+        .map((f) => ({ relativePath: f.relativePath })),
+    };
+    writeSession(sessionPath, sessionData);
   } else {
     // Single file
     const outputAbs = options.outputPath
@@ -116,6 +123,19 @@ export async function runTranspile(options: TranspileOptions): Promise<void> {
       setting,
       basename(options.templatePath)
     );
+
+    // Write session file after transpilation.
+    const sessionPath = options.session
+      ? resolve(options.session)
+      : join(dirname(outputAbs), "ktzm-session.json");
+    const sessionData: TranspileSession = {
+      version: CLI_VERSION,
+      settingFile: settingAbs,
+      templatePath: templateAbs,
+      transpilatePath: outputAbs,
+      files: [{ relativePath: "" }],
+    };
+    writeSession(sessionPath, sessionData);
   }
 }
 

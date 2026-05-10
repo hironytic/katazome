@@ -1,96 +1,84 @@
-import { resolve, join, basename, dirname } from "node:path";
+import { resolve, join, basename } from "node:path";
 import { writeFileSync, statSync, existsSync } from "node:fs";
+import { createInterface } from "node:readline";
 import { loadSetting } from "../config/loader.ts";
 import { detranspile } from "../core/detranspiler.ts";
-import { walkDirectory } from "../fs/walker.ts";
 import {
-  assertNotSamePath,
   getTagDefForExtension,
   getExtension,
   ensureDir,
-  resolveSettingPath,
 } from "./utils.ts";
 import { KatazomeError } from "../errors.ts";
+import { readSession, checkSessionVersion } from "../session.ts";
 
 export interface DetranspileOptions {
-  setting?: string;
-  transpilatePath: string;
+  sessionPath: string;
   outputPath?: string;
+  force?: boolean;
+}
+
+async function askConfirmation(message: string): Promise<boolean> {
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  return new Promise((resolve) => {
+    rl.question(`${message} [y/N] `, (answer) => {
+      rl.close();
+      resolve(answer.trim().toLowerCase() === "y");
+    });
+  });
 }
 
 /**
- * Runs the `detranspile` command: converts transpilate file(s) back to template(s).
+ * Runs the `detranspile` command: converts transpilate file(s) back to template(s)
+ * using a transpile session file.
  */
 export async function runDetranspile(options: DetranspileOptions): Promise<void> {
-  const settingPath = resolveSettingPath(options.setting, options.transpilatePath);
-  const setting = await loadSetting(settingPath);
-
-  const inputAbs = resolve(options.transpilatePath);
-  const settingAbs = resolve(settingPath);
+  const inputAbs = resolve(options.sessionPath);
   const isDirectory = existsSync(inputAbs) && statSync(inputAbs).isDirectory();
+  const sessionFilePath = isDirectory
+    ? join(inputAbs, "ktzm-session.json")
+    : inputAbs;
 
-  if (isDirectory) {
-    if (options.outputPath === undefined) {
-      throw new KatazomeError(
-        "Output path is required when the input is a directory."
-      );
-    }
-    const outputAbs = resolve(options.outputPath);
-    assertNotSamePath(inputAbs, outputAbs);
+  const session = await readSession(sessionFilePath);
+  checkSessionVersion(session);
 
-    const files = walkDirectory(inputAbs);
-    for (const file of files) {
-      if (file.absolutePath === settingAbs) continue;
-      // Strip .ts from the relative path to get the output file name.
-      if (!file.relativePath.endsWith(".ts")) {
-        throw new KatazomeError(
-          `File "${file.relativePath}" in input directory does not end with ".ts". ` +
-          `Only .ts files (transpiled files) are expected.`
-        );
-      }
-      const outRelPath = file.relativePath.slice(0, -3); // remove ".ts"
-      const outAbsPath = join(outputAbs, outRelPath);
-      if (outAbsPath === settingAbs) {
-        throw new KatazomeError(
-          `Output path conflicts with the setting file: "${outAbsPath}"`
-        );
-      }
-      assertNotSamePath(file.absolutePath, outAbsPath);
-      await detranspileFile(file.absolutePath, outAbsPath, setting, file.relativePath);
-    }
-  } else {
-    // Single file
-    const outputAbs = options.outputPath
-      ? resolve(options.outputPath)
-      : computeDefaultOutputPath(inputAbs);
+  const setting = await loadSetting(session.settingFile);
 
-    if (inputAbs === settingAbs) {
-      throw new KatazomeError(
-        `The input file is the same as the setting file: "${inputAbs}"`
-      );
-    }
-    if (outputAbs === settingAbs) {
-      throw new KatazomeError(
-        `Output path conflicts with the setting file: "${outputAbs}"`
-      );
-    }
-    assertNotSamePath(inputAbs, outputAbs);
-    await detranspileFile(inputAbs, outputAbs, setting, basename(options.transpilatePath));
-  }
-}
+  const outputAbs = options.outputPath
+    ? resolve(options.outputPath)
+    : session.templatePath;
 
-/**
- * For a transpilate file `foo.c.ts`, the default output is `foo.c` in the same directory.
- */
-function computeDefaultOutputPath(transpilatePath: string): string {
-  const dir = dirname(transpilatePath);
-  const name = basename(transpilatePath);
-  if (!name.endsWith(".ts")) {
-    throw new KatazomeError(
-      `Cannot determine default output path for "${transpilatePath}": does not end with ".ts".`
+  if (outputAbs === session.templatePath && !options.force) {
+    const confirmed = await askConfirmation(
+      `This will overwrite the original template at "${outputAbs}". Continue?`
     );
+    if (!confirmed) {
+      process.stderr.write("Aborted.\n");
+      return;
+    }
   }
-  return join(dir, name.slice(0, -3));
+
+  for (const sessionFile of session.files) {
+    let transpilateAbsPath: string;
+    let templateOutAbsPath: string;
+    let displayName: string;
+
+    if (sessionFile.relativePath === "") {
+      // Single file mode
+      transpilateAbsPath = session.transpilatePath;
+      templateOutAbsPath = outputAbs;
+      displayName = basename(session.transpilatePath);
+    } else {
+      // Directory mode
+      transpilateAbsPath = join(
+        session.transpilatePath,
+        `${sessionFile.relativePath}.ts`
+      );
+      templateOutAbsPath = join(outputAbs, sessionFile.relativePath);
+      displayName = sessionFile.relativePath;
+    }
+
+    await detranspileFile(transpilateAbsPath, templateOutAbsPath, setting, displayName);
+  }
 }
 
 async function detranspileFile(

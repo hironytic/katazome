@@ -4,13 +4,14 @@ import { runGenerate } from "./commands/generate.ts";
 import { runTranspile } from "./commands/transpile.ts";
 import { runDetranspile } from "./commands/detranspile.ts";
 import { KatazomeError } from "./errors.ts";
+import { CLI_VERSION } from "./version.ts";
 
 const program = new Command();
 
 program
   .name("ktzm")
   .description("Generate source files from TypeScript templates")
-  .version("0.1.0");
+  .version(CLI_VERSION);
 
 // ---------------------------------------------------------------------------
 // generate
@@ -40,17 +41,19 @@ program
   .option("--setting <file>", "Path to the setting file (JSON, JSON5, YAML, or TOML; default: ktzm-setting.{json,json5,yaml,toml} next to the template)")
   .option("--input <file>", "Path to the input data file (JSON, JSON5, YAML, or TOML)")
   .option("--runtime <file>", "Output path for the runtime file (default: ktzm-runtime.ts next to the transpiled file)")
+  .option("--session <file>", "Output path for the session file (default: ktzm-session.json next to the transpiled file)")
   .argument("<template-file>", "Template file or directory")
   .argument("[output-transpiled-file]", "Output transpiled file or directory (default: <template-file>.ts)")
   .action(async (
     templateFile: string,
     outputFile: string | undefined,
-    options: { setting?: string; input?: string; runtime?: string }
+    options: { setting?: string; input?: string; runtime?: string; session?: string }
   ) => {
     await runTranspile({
       ...(options.setting !== undefined ? { setting: options.setting } : {}),
       ...(options.input !== undefined ? { input: options.input } : {}),
       ...(options.runtime !== undefined ? { runtime: options.runtime } : {}),
+      ...(options.session !== undefined ? { session: options.session } : {}),
       templatePath: templateFile,
       ...(outputFile !== undefined ? { outputPath: outputFile } : {}),
     });
@@ -61,19 +64,19 @@ program
 // ---------------------------------------------------------------------------
 program
   .command("detranspile")
-  .description("Convert a transpiled file back to the original template")
-  .option("--setting <file>", "Path to the setting file (JSON, JSON5, YAML, or TOML; default: ktzm-setting.{json,json5,yaml,toml} next to the transpiled file)")
-  .argument("<transpiled-file>", "Transpiled file or directory")
-  .argument("[output-template-file]", "Output template file or directory (default: <transpiled-file> without .ts)")
+  .description("Convert a transpiled file back to the original template using a transpile session")
+  .option("--force", "Skip confirmation prompt when overwriting the original template")
+  .argument("<session-file>", "Transpile session file (ktzm-session.json) or directory containing it")
+  .argument("[output-path]", "Output template file or directory (default: original template path stored in session)")
   .action(async (
-    transpilateFile: string,
-    outputFile: string | undefined,
-    options: { setting?: string }
+    sessionFile: string,
+    outputPath: string | undefined,
+    options: { force?: boolean }
   ) => {
     await runDetranspile({
-      ...(options.setting !== undefined ? { setting: options.setting } : {}),
-      transpilatePath: transpilateFile,
-      ...(outputFile !== undefined ? { outputPath: outputFile } : {}),
+      sessionPath: sessionFile,
+      ...(outputPath !== undefined ? { outputPath } : {}),
+      ...(options.force ? { force: true } : {}),
     });
   });
 

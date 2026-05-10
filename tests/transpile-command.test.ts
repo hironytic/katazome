@@ -48,7 +48,7 @@ describe("runTranspile without --setting", () => {
 });
 
 describe("runTranspile setting file handling", () => {
-  test("copies setting file as-is when input is a directory", async () => {
+  test("skips setting file when input is a directory", async () => {
     await withTempDir(async (dir) => {
       const inputDir = join(dir, "src");
       const outputDir = join(dir, "out");
@@ -59,9 +59,8 @@ describe("runTranspile setting file handling", () => {
 
       await runTranspile({ templatePath: inputDir, outputPath: outputDir });
 
-      // Setting file is copied without .ts extension
-      expect(existsSync(join(outputDir, "ktzm-setting.json"))).toBe(true);
-      expect(await Bun.file(join(outputDir, "ktzm-setting.json")).text()).toBe(settingJson);
+      // Setting file is not copied to the output directory
+      expect(existsSync(join(outputDir, "ktzm-setting.json"))).toBe(false);
       // Template is transpiled with .ts extension
       expect(existsSync(join(outputDir, "hello.txt.ts"))).toBe(true);
     });
