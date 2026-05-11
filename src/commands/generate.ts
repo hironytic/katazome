@@ -53,14 +53,21 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
         );
       }
       assertNotSamePath(file.absolutePath, outAbsPath);
-      await generateFile(
-        file.absolutePath,
-        outAbsPath,
-        setting,
-        inputData,
-        file.relativePath,
-        settingDir,
-      );
+      try {
+        await generateFile(
+          file.absolutePath,
+          outAbsPath,
+          setting,
+          inputData,
+          file.relativePath,
+          settingDir,
+        );
+      } catch (err) {
+        if (err instanceof KatazomeError) {
+          throw new KatazomeError(`${file.relativePath}: ${err.message}`);
+        }
+        throw err;
+      }
     }
   } else {
     if (templateAbs === settingAbs) {

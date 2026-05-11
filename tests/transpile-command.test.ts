@@ -191,6 +191,24 @@ describe("runTranspile imports", () => {
   });
 });
 
+describe("runTranspile error context in directory mode", () => {
+  test("includes relative path in error message when a file in a directory fails", async () => {
+    await withTempDir(async (dir) => {
+      const inputDir = join(dir, "src");
+      const outputDir = join(dir, "out");
+      mkdirSync(join(inputDir, "sub"), { recursive: true });
+
+      writeFileSync(join(inputDir, "ktzm-setting.json"), settingJson, "utf-8");
+      // This file has an unclosed tag and will trigger a KatazomeError
+      writeFileSync(join(inputDir, "sub", "broken.txt"), "/*{% unclosed\n", "utf-8");
+
+      await expect(
+        runTranspile({ templatePath: inputDir, outputPath: outputDir, force: true })
+      ).rejects.toThrow("sub/broken.txt:");
+    });
+  });
+});
+
 describe("runTranspile exclude", () => {
   test("excludes files matching exclude patterns in directory mode", async () => {
     await withTempDir(async (dir) => {

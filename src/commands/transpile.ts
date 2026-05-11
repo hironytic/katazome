@@ -86,13 +86,20 @@ export async function runTranspile(options: TranspileOptions): Promise<void> {
         );
       }
       assertNotSamePath(file.absolutePath, outAbsPath);
-      await transpileFile(
-        file.absolutePath,
-        outAbsPath,
-        runtimePath,
-        setting,
-        settingDir,
-      );
+      try {
+        await transpileFile(
+          file.absolutePath,
+          outAbsPath,
+          runtimePath,
+          setting,
+          settingDir,
+        );
+      } catch (err) {
+        if (err instanceof KatazomeError) {
+          throw new KatazomeError(`${file.relativePath}: ${err.message}`);
+        }
+        throw err;
+      }
     }
 
     // Write session file after all files are transpiled.

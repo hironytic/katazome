@@ -293,6 +293,24 @@ describe("runGenerate exclude", () => {
   });
 });
 
+describe("runGenerate error context in directory mode", () => {
+  test("includes relative path in error message when a file in a directory fails", async () => {
+    await withTempDir(async (dir) => {
+      const inputDir = join(dir, "src");
+      const outputDir = join(dir, "out");
+      mkdirSync(join(inputDir, "sub"), { recursive: true });
+
+      writeFileSync(join(inputDir, "ktzm-setting.json"), settingJson, "utf-8");
+      // This file has an unclosed tag and will trigger a KatazomeError
+      writeFileSync(join(inputDir, "sub", "broken.txt"), "/*{% unclosed\n", "utf-8");
+
+      await expect(
+        runGenerate({ templatePath: inputDir, outputPath: outputDir })
+      ).rejects.toThrow("sub/broken.txt:");
+    });
+  });
+});
+
 describe("runGenerate imports", () => {
   test("user import is callable from a value tag", async () => {
     await withTempDir(async (dir) => {
