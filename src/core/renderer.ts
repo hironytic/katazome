@@ -14,11 +14,13 @@ import { KatazomeError } from "../errors.ts";
  *
  * @param transpilateContent  The TypeScript transpilate source code.
  * @param inputData           Parsed input data (embedded into the runtime).
+ * @param answerData          Resolved question answers (embedded into the runtime).
  * @param outputFilePath      Absolute path where the rendered output should be written.
  */
 export async function render(
   transpilateContent: string,
   inputData: unknown,
+  answerData: unknown,
   outputFilePath: string
 ): Promise<void> {
   const tmpDir = join(tmpdir(), `ktzm-${randomUUID()}`);
@@ -28,7 +30,7 @@ export async function render(
     const runtimePath = join(tmpDir, "ktzm-runtime.ts");
     const transpilatePath = join(tmpDir, "transpilate.ts");
 
-    writeFileSync(runtimePath, generateRuntimeContent(inputData, outputFilePath), "utf-8");
+    writeFileSync(runtimePath, generateRuntimeContent(inputData, answerData, outputFilePath), "utf-8");
     writeFileSync(transpilatePath, transpilateContent, "utf-8");
     // Pre-create the output file so it always exists after render, even if
     // the template produces no output (the runtime will overwrite it).

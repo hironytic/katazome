@@ -73,6 +73,40 @@ export interface FilePatternConfig {
   imports?: FilePatternImportsConfig;
 }
 
+// ---------------------------------------------------------------------------
+// Questions
+// ---------------------------------------------------------------------------
+
+/** A single selectable option for a select-kind question. */
+export interface QuestionOptionDefinition {
+  label: string;
+  value: unknown;
+}
+
+/** A question that accepts free text input from the user. */
+export interface QuestionTextDefinition {
+  name: string;
+  kind: "text";
+  type: "string" | "number";
+  message: string;
+  default?: string | number;
+}
+
+/** A question that presents a numbered list for the user to choose from. */
+export interface QuestionSelectDefinition {
+  name: string;
+  kind: "select";
+  message: string;
+  options: QuestionOptionDefinition[];
+  default?: unknown;
+}
+
+export type QuestionDefinition = QuestionTextDefinition | QuestionSelectDefinition;
+
+// ---------------------------------------------------------------------------
+// Setting
+// ---------------------------------------------------------------------------
+
 /** The parsed setting file structure. */
 export interface Setting {
   /** Common tag definitions applied to all files (may have empty arrays). */
@@ -85,6 +119,8 @@ export interface Setting {
   imports?: RootImportsConfig;
   /** File-pattern-specific settings. Matched in order; exact patterns take priority over wildcards. */
   files: FilePatternConfig[];
+  /** Questions to ask the user before processing. Answers are available as ktzm.answer. */
+  questions?: QuestionDefinition[];
 }
 
 // ---------------------------------------------------------------------------

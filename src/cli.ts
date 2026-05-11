@@ -21,12 +21,14 @@ program
   .description("Transpile and render a template to produce a final output file")
   .option("--setting <file>", "Path to the setting file (JSON, JSON5, YAML, or TOML; default: ktzm-setting.{json,json5,yaml,toml} next to the template)")
   .option("--input <file>", "Path to the input data file (JSON, JSON5, YAML, or TOML)")
+  .option("--answer <name=value>", "Pre-supply an answer to a question (repeatable)", (val: string, prev: string[]) => [...prev, val], [] as string[])
   .argument("<template-file>", "Template file or directory")
   .argument("<output-file>", "Output file or directory")
-  .action(async (templateFile: string, outputFile: string, options: { setting?: string; input?: string }) => {
+  .action(async (templateFile: string, outputFile: string, options: { setting?: string; input?: string; answer: string[] }) => {
     await runGenerate({
       ...(options.setting !== undefined ? { setting: options.setting } : {}),
       ...(options.input !== undefined ? { input: options.input } : {}),
+      answers: options.answer,
       templatePath: templateFile,
       outputPath: outputFile,
     });
@@ -40,6 +42,7 @@ program
   .description("Convert a template file to a transpiled file (TypeScript)")
   .option("--setting <file>", "Path to the setting file (JSON, JSON5, YAML, or TOML; default: ktzm-setting.{json,json5,yaml,toml} next to the template)")
   .option("--input <file>", "Path to the input data file (JSON, JSON5, YAML, or TOML)")
+  .option("--answer <name=value>", "Pre-supply an answer to a question (repeatable)", (val: string, prev: string[]) => [...prev, val], [] as string[])
   .option("--runtime <file>", "Output path for the runtime file (default: ktzm-runtime.ts next to the transpiled file)")
   .option("--session <file>", "Output path for the session file (default: ktzm-session.json next to the transpiled file)")
   .option("--force", "Skip confirmation prompt when the output path already exists")
@@ -48,11 +51,12 @@ program
   .action(async (
     templateFile: string,
     outputFile: string | undefined,
-    options: { setting?: string; input?: string; runtime?: string; session?: string; force?: boolean }
+    options: { setting?: string; input?: string; answer: string[]; runtime?: string; session?: string; force?: boolean }
   ) => {
     await runTranspile({
       ...(options.setting !== undefined ? { setting: options.setting } : {}),
       ...(options.input !== undefined ? { input: options.input } : {}),
+      answers: options.answer,
       ...(options.runtime !== undefined ? { runtime: options.runtime } : {}),
       ...(options.session !== undefined ? { session: options.session } : {}),
       templatePath: templateFile,

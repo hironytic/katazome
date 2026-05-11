@@ -451,4 +451,135 @@ describe("loadSetting", () => {
       spy.mockRestore();
     }
   });
+
+  // -------------------------------------------------------------------------
+  // Questions validation
+  // -------------------------------------------------------------------------
+
+  test("parses text question with type and default", async () => {
+    const settingJson = JSON.stringify({
+      questions: [
+        { name: "propName", kind: "text", type: "string", message: "Property name?", default: "foo" },
+      ],
+    });
+    const tmpPath = `${import.meta.dir}/tmp-questions-text.json`;
+    await Bun.write(tmpPath, settingJson);
+    try {
+      const setting = await loadSetting(tmpPath);
+      expect(setting.questions).toHaveLength(1);
+      const q = setting.questions![0]!;
+      expect(q.kind).toBe("text");
+      expect(q.name).toBe("propName");
+      if (q.kind === "text") {
+        expect(q.type).toBe("string");
+        expect(q.default).toBe("foo");
+      }
+    } finally {
+      await Bun.spawn(["rm", "-f", tmpPath]).exited;
+    }
+  });
+
+  test("parses select question with options", async () => {
+    const settingJson = JSON.stringify({
+      questions: [
+        {
+          name: "propType",
+          kind: "select",
+          message: "Property type?",
+          options: [
+            { label: "Getter only", value: 10 },
+            { label: "Getter and setter", value: 20 },
+          ],
+          default: 10,
+        },
+      ],
+    });
+    const tmpPath = `${import.meta.dir}/tmp-questions-select.json`;
+    await Bun.write(tmpPath, settingJson);
+    try {
+      const setting = await loadSetting(tmpPath);
+      const q = setting.questions![0]!;
+      expect(q.kind).toBe("select");
+      if (q.kind === "select") {
+        expect(q.options).toHaveLength(2);
+        expect(q.options[0]!.label).toBe("Getter only");
+        expect(q.default).toBe(10);
+      }
+    } finally {
+      await Bun.spawn(["rm", "-f", tmpPath]).exited;
+    }
+  });
+
+  test("throws on duplicate question names", async () => {
+    const settingJson = JSON.stringify({
+      questions: [
+        { name: "foo", kind: "text", type: "string", message: "First?" },
+        { name: "foo", kind: "text", type: "string", message: "Second?" },
+      ],
+    });
+    const tmpPath = `${import.meta.dir}/tmp-questions-dup-name.json`;
+    await Bun.write(tmpPath, settingJson);
+    try {
+      await expect(loadSetting(tmpPath)).rejects.toThrow(KatazomeError);
+    } finally {
+      await Bun.spawn(["rm", "-f", tmpPath]).exited;
+    }
+  });
+
+  test("throws when text question has options field", async () => {
+    const settingJson = JSON.stringify({
+      questions: [
+        { name: "foo", kind: "text", type: "string", message: "Msg?", options: [] },
+      ],
+    });
+    const tmpPath = `${import.meta.dir}/tmp-questions-text-options.json`;
+    await Bun.write(tmpPath, settingJson);
+    try {
+      await expect(loadSetting(tmpPath)).rejects.toThrow(KatazomeError);
+    } finally {
+      await Bun.spawn(["rm", "-f", tmpPath]).exited;
+    }
+  });
+
+  test("throws when select question has type field", async () => {
+    const settingJson = JSON.stringify({
+      questions: [
+        { name: "foo", kind: "select", type: "string", message: "Msg?", options: [{ label: "A", value: 1 }] },
+      ],
+    });
+    const tmpPath = `${import.meta.dir}/tmp-questions-select-type.json`;
+    await Bun.write(tmpPath, settingJson);
+    try {
+      await expect(loadSetting(tmpPath)).rejects.toThrow(KatazomeError);
+    } finally {
+      await Bun.spawn(["rm", "-f", tmpPath]).exited;
+    }
+  });
+
+  test("throws when select question has empty options", async () => {
+    const settingJson = JSON.stringify({
+      questions: [
+        { name: "foo", kind: "select", message: "Msg?", options: [] },
+      ],
+    });
+    const tmpPath = `${import.meta.dir}/tmp-questions-empty-options.json`;
+    await Bun.write(tmpPath, settingJson);
+    try {
+      await expect(loadSetting(tmpPath)).rejects.toThrow(KatazomeError);
+    } finally {
+      await Bun.spawn(["rm", "-f", tmpPath]).exited;
+    }
+  });
+
+  test("questions is undefined when omitted", async () => {
+    const settingJson = JSON.stringify({ files: [] });
+    const tmpPath = `${import.meta.dir}/tmp-questions-absent.json`;
+    await Bun.write(tmpPath, settingJson);
+    try {
+      const setting = await loadSetting(tmpPath);
+      expect(setting.questions).toBeUndefined();
+    } finally {
+      await Bun.spawn(["rm", "-f", tmpPath]).exited;
+    }
+  });
 });

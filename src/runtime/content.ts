@@ -13,13 +13,15 @@
  *     or to stdout if no path is available.
  *
  * @param inputData           Parsed input data to embed as a JSON literal.
+ * @param answerData          Resolved question answers to embed as a JSON literal.
  * @param embedOutputFilePath When provided, the output file path is embedded as
  *                            a literal (used by the renderer). When omitted, the
  *                            runtime reads KTZM_OUTPUT_FILE from the environment
  *                            (used by the transpile command for manual bun run).
  */
-export function generateRuntimeContent(inputData: unknown, embedOutputFilePath?: string): string {
+export function generateRuntimeContent(inputData: unknown, answerData: unknown, embedOutputFilePath?: string): string {
   const inputJson = JSON.stringify(inputData ?? {});
+  const answerJson = JSON.stringify(answerData ?? {});
   const outputFilePathDecl = embedOutputFilePath !== undefined
     ? `const outputFilePath = ${JSON.stringify(embedOutputFilePath)};`
     : `const outputFilePath = process.env["KTZM_OUTPUT_FILE"];`;
@@ -33,6 +35,8 @@ ${outputFilePathDecl}
 
 const inputData: unknown = ${inputJson};
 
+const answerData: unknown = ${answerJson};
+
 const chunks: string[] = [];
 
 const ktzm = {
@@ -44,6 +48,12 @@ const ktzm = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   get input(): any {
     return inputData as any;
+  },
+  // Answer data is typed as any so that templates can access properties
+  // freely (e.g. ktzm.answer.propName) without TypeScript errors.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  get answer(): any {
+    return answerData as any;
   },
 };
 
