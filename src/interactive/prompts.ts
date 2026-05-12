@@ -39,14 +39,17 @@ export async function askSelect(
         rl.close();
         const trimmed = answer.trim();
         if (trimmed === "" && resolvedDefaultIndex !== undefined) {
+          process.stdout.write("\n");
           resolve(options[resolvedDefaultIndex]!.value);
           return;
         }
         const n = parseInt(trimmed, 10);
         if (!isNaN(n) && n >= 1 && n <= options.length) {
+          process.stdout.write("\n");
           resolve(options[n - 1]!.value);
           return;
         }
+        process.stderr.write(`Please enter a number between 1 and ${options.length}.\n\n`);
         ask();
       });
     };
@@ -77,12 +80,15 @@ export async function askText(
         const trimmed = answer.trim();
         if (trimmed === "") {
           if (defaultValue !== undefined) {
+            process.stdout.write("\n");
             resolve(defaultValue);
           } else {
+            process.stderr.write("This field is required.\n\n");
             ask();
           }
           return;
         }
+        process.stdout.write("\n");
         resolve(trimmed);
       });
     };
@@ -113,17 +119,21 @@ export async function askNumber(
         const trimmed = answer.trim();
         if (trimmed === "") {
           if (defaultValue !== undefined) {
+            process.stdout.write("\n");
             resolve(defaultValue);
           } else {
+            process.stderr.write("This field is required.\n\n");
             ask();
           }
           return;
         }
         const n = Number(trimmed);
         if (!isNaN(n)) {
+          process.stdout.write("\n");
           resolve(n);
           return;
         }
+        process.stderr.write(`"${trimmed}" is not a valid number.\n\n`);
         ask();
       });
     };
