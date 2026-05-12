@@ -311,6 +311,215 @@ describe("runGenerate error context in directory mode", () => {
   });
 });
 
+describe("runGenerate with questions", () => {
+  test("--answers supplies string answer accessible as ktzm.answer", async () => {
+    await withTempDir(async (dir) => {
+      const setting = {
+        questions: [
+          { name: "propName", kind: "text", type: "string", message: "Name?" },
+        ],
+        files: [
+          {
+            pattern: "*.txt",
+            tagDefinition: {
+              value: [{ start: "_V_", end: "_" }],
+            },
+          },
+        ],
+      };
+      writeFileSync(join(dir, "ktzm-setting.json"), JSON.stringify(setting), "utf-8");
+      writeFileSync(join(dir, "template.txt"), "_V_ktzm.answer.propName_\n", "utf-8");
+
+      await runGenerate({
+        setting: join(dir, "ktzm-setting.json"),
+        templatePath: join(dir, "template.txt"),
+        outputPath: join(dir, "output.txt"),
+        answers: ["propName=hello"],
+      });
+
+      expect(await Bun.file(join(dir, "output.txt")).text()).toBe("hello\n");
+    });
+  });
+
+  test("--answers supplies number answer accessible as ktzm.answer", async () => {
+    await withTempDir(async (dir) => {
+      const setting = {
+        questions: [
+          { name: "count", kind: "text", type: "number", message: "Count?" },
+        ],
+        files: [
+          {
+            pattern: "*.txt",
+            tagDefinition: {
+              value: [{ start: "_V_", end: "_" }],
+            },
+          },
+        ],
+      };
+      writeFileSync(join(dir, "ktzm-setting.json"), JSON.stringify(setting), "utf-8");
+      writeFileSync(join(dir, "template.txt"), "_V_ktzm.answer.count * 2_\n", "utf-8");
+
+      await runGenerate({
+        setting: join(dir, "ktzm-setting.json"),
+        templatePath: join(dir, "template.txt"),
+        outputPath: join(dir, "output.txt"),
+        answers: ["count=21"],
+      });
+
+      expect(await Bun.file(join(dir, "output.txt")).text()).toBe("42\n");
+    });
+  });
+
+  test("--answers supplies select answer accessible as ktzm.answer", async () => {
+    await withTempDir(async (dir) => {
+      const setting = {
+        questions: [
+          {
+            name: "mode",
+            kind: "select",
+            message: "Mode?",
+            options: [
+              { label: "Fast", value: "fast" },
+              { label: "Slow", value: "slow" },
+            ],
+          },
+        ],
+        files: [
+          {
+            pattern: "*.txt",
+            tagDefinition: {
+              value: [{ start: "_V_", end: "_" }],
+            },
+          },
+        ],
+      };
+      writeFileSync(join(dir, "ktzm-setting.json"), JSON.stringify(setting), "utf-8");
+      writeFileSync(join(dir, "template.txt"), "_V_ktzm.answer.mode_\n", "utf-8");
+
+      await runGenerate({
+        setting: join(dir, "ktzm-setting.json"),
+        templatePath: join(dir, "template.txt"),
+        outputPath: join(dir, "output.txt"),
+        answers: ["mode=slow"],
+      });
+
+      expect(await Bun.file(join(dir, "output.txt")).text()).toBe("slow\n");
+    });
+  });
+
+  test("uses question default when no answer provided (non-interactive)", async () => {
+    await withTempDir(async (dir) => {
+      const setting = {
+        questions: [
+          { name: "greeting", kind: "text", type: "string", message: "Greeting?", default: "hi" },
+        ],
+        files: [
+          {
+            pattern: "*.txt",
+            tagDefinition: { value: [{ start: "_V_", end: "_" }] },
+          },
+        ],
+      };
+      writeFileSync(join(dir, "ktzm-setting.json"), JSON.stringify(setting), "utf-8");
+      writeFileSync(join(dir, "template.txt"), "_V_ktzm.answer.greeting_\n", "utf-8");
+
+      // process.stdin.isTTY is falsy in test environment (non-interactive)
+      await runGenerate({
+        setting: join(dir, "ktzm-setting.json"),
+        templatePath: join(dir, "template.txt"),
+        outputPath: join(dir, "output.txt"),
+      });
+
+      expect(await Bun.file(join(dir, "output.txt")).text()).toBe("hi\n");
+    });
+  });
+
+  test("throws when no answer and no default in non-interactive mode", async () => {
+    await withTempDir(async (dir) => {
+      const setting = {
+        questions: [
+          { name: "required", kind: "text", type: "string", message: "Required?" },
+        ],
+        files: [
+          {
+            pattern: "*.txt",
+            tagDefinition: { value: [{ start: "_V_", end: "_" }] },
+          },
+        ],
+      };
+      writeFileSync(join(dir, "ktzm-setting.json"), JSON.stringify(setting), "utf-8");
+      writeFileSync(join(dir, "template.txt"), "_V_ktzm.answer.required_\n", "utf-8");
+
+      await expect(
+        runGenerate({
+          setting: join(dir, "ktzm-setting.json"),
+          templatePath: join(dir, "template.txt"),
+          outputPath: join(dir, "output.txt"),
+        })
+      ).rejects.toThrow(KatazomeError);
+    });
+  });
+
+  test("throws when --answer number value is not numeric", async () => {
+    await withTempDir(async (dir) => {
+      const setting = {
+        questions: [
+          { name: "count", kind: "text", type: "number", message: "Count?" },
+        ],
+        files: [
+          {
+            pattern: "*.txt",
+            tagDefinition: { value: [{ start: "_V_", end: "_" }] },
+          },
+        ],
+      };
+      writeFileSync(join(dir, "ktzm-setting.json"), JSON.stringify(setting), "utf-8");
+      writeFileSync(join(dir, "template.txt"), "_V_ktzm.answer.count_\n", "utf-8");
+
+      await expect(
+        runGenerate({
+          setting: join(dir, "ktzm-setting.json"),
+          templatePath: join(dir, "template.txt"),
+          outputPath: join(dir, "output.txt"),
+          answers: ["count=notanumber"],
+        })
+      ).rejects.toThrow(KatazomeError);
+    });
+  });
+
+  test("throws when --answer select value does not match any option", async () => {
+    await withTempDir(async (dir) => {
+      const setting = {
+        questions: [
+          {
+            name: "mode",
+            kind: "select",
+            message: "Mode?",
+            options: [{ label: "Fast", value: "fast" }],
+          },
+        ],
+        files: [
+          {
+            pattern: "*.txt",
+            tagDefinition: { value: [{ start: "_V_", end: "_" }] },
+          },
+        ],
+      };
+      writeFileSync(join(dir, "ktzm-setting.json"), JSON.stringify(setting), "utf-8");
+      writeFileSync(join(dir, "template.txt"), "_V_ktzm.answer.mode_\n", "utf-8");
+
+      await expect(
+        runGenerate({
+          setting: join(dir, "ktzm-setting.json"),
+          templatePath: join(dir, "template.txt"),
+          outputPath: join(dir, "output.txt"),
+          answers: ["mode=unknown"],
+        })
+      ).rejects.toThrow(KatazomeError);
+    });
+  });
+});
+
 describe("runGenerate imports", () => {
   test("user import is callable from a value tag", async () => {
     await withTempDir(async (dir) => {

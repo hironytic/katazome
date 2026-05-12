@@ -17,10 +17,12 @@ import {
   resolveSettingPath,
 } from "./utils.ts";
 import { KatazomeError } from "../errors.ts";
+import { parseCliAnswers, resolveAnswers } from "../questions/resolver.ts";
 
 export interface GenerateOptions {
   setting?: string;
   input?: string;
+  answers?: string[];
   templatePath: string;
   outputPath: string;
 }
@@ -32,6 +34,10 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
   const settingPath = resolveSettingPath(options.setting, options.templatePath);
   const setting = await loadSetting(settingPath);
   const inputData = options.input !== undefined ? await loadInput(options.input) : {};
+
+  const cliAnswers = parseCliAnswers(options.answers ?? []);
+  const isInteractive = process.stdin.isTTY === true;
+  const answerData = await resolveAnswers(setting.questions ?? [], cliAnswers, isInteractive);
 
   const templateAbs = resolve(options.templatePath);
   const settingAbs = resolve(settingPath);
@@ -59,6 +65,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
           outAbsPath,
           setting,
           inputData,
+          answerData,
           file.relativePath,
           settingDir,
         );
@@ -85,6 +92,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
       outputAbs,
       setting,
       inputData,
+      answerData,
       basename(options.templatePath),
       settingDir,
     );
@@ -96,6 +104,7 @@ async function generateFile(
   outputPath: string,
   setting: ReturnType<typeof loadSetting> extends Promise<infer T> ? T : never,
   inputData: unknown,
+  answerData: unknown,
   displayName: string,
   settingDir: string,
 ): Promise<void> {
@@ -134,5 +143,5 @@ async function generateFile(
   const transpilate = transpileTokens(tokens, "./ktzm-runtime.ts", userImports);
 
   ensureDir(outputPath);
-  await render(transpilate, inputData, outputPath);
+  await render(transpilate, inputData, answerData, outputPath);
 }

@@ -2,6 +2,7 @@ import { resolve, dirname, relative, join } from "node:path";
 import { mkdirSync, existsSync, statSync } from "node:fs";
 import { createInterface } from "node:readline";
 import { KatazomeError } from "../errors.ts";
+import { askSelect } from "../interactive/prompts.ts";
 import type { ExistingFileBehavior, FilePatternConfig, ImportEntry, TagDefinition, Setting } from "../types.ts";
 
 const SETTING_EXTS = ["json", "json5", "yaml", "toml"] as const;
@@ -203,14 +204,14 @@ export async function askConfirmation(message: string): Promise<boolean> {
 export async function askExistingFileAction(
   displayName: string
 ): Promise<"overwrite" | "skip" | "error"> {
-  const rl = createInterface({ input: process.stdin, output: process.stdout });
-  return new Promise((resolve) => {
-    rl.question(`"${displayName}" already exists. (o)verwrite, (S)kip, (e)rror? `, (answer) => {
-      rl.close();
-      const a = answer.trim().toLowerCase();
-      if (a === "o") resolve("overwrite");
-      else if (a === "e") resolve("error");
-      else resolve("skip");
-    });
-  });
+  const options = [
+    { label: "Skip", value: "skip" as const },
+    { label: "Overwrite", value: "overwrite" as const },
+    { label: "Error", value: "error" as const },
+  ];
+  return await askSelect(
+    `"${displayName}" already exists. What would you like to do?`,
+    options,
+    0,
+  ) as "overwrite" | "skip" | "error";
 }

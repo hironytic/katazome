@@ -5,6 +5,10 @@ import type {
   FilePatternImportsConfig,
   FilePatternTagDefinitionConfig,
   ImportEntry,
+  QuestionDefinition,
+  QuestionOptionDefinition,
+  QuestionSelectDefinition,
+  QuestionTextDefinition,
   RootImportsConfig,
   Setting,
   TagDefinition,
@@ -29,13 +33,14 @@ function validateSetting(value: unknown, filePath: string): Setting {
 
   const obj = value as Record<string, unknown>;
 
-  warnUnknownKeys(obj, ["tagDefinition", "existingFile", "exclude", "imports", "files"], filePath, "");
+  warnUnknownKeys(obj, ["tagDefinition", "existingFile", "exclude", "imports", "files", "questions"], filePath, "");
 
   const tagDefinition = validateCommonTagDefinition(obj["tagDefinition"], filePath);
   const existingFile = validateExistingFileBehavior(obj["existingFile"], filePath, `existingFile`);
   const exclude = validateExcludeArray(obj["exclude"], filePath);
   const imports = validateRootImportsConfig(obj["imports"], filePath);
   const files = validateFilesArray(obj["files"], filePath);
+  const questions = validateQuestionsArray(obj["questions"], filePath);
 
   // Duplicate start string check for each file pattern's resolved definition.
   for (const [i, fileConfig] of files.entries()) {
@@ -59,6 +64,7 @@ function validateSetting(value: unknown, filePath: string): Setting {
     exclude,
     ...(imports !== undefined ? { imports } : {}),
     files,
+    ...(questions !== undefined ? { questions } : {}),
   };
 }
 
@@ -282,7 +288,7 @@ function validateFilePatternConfig(
 function validateFilePatternTagDefinitionConfig(
   value: unknown,
   index: number,
-  pattern: string,
+  _pattern: string,
   filePath: string
 ): FilePatternTagDefinitionConfig {
   const location = `files[${index}].tagDefinition`;
@@ -395,7 +401,7 @@ function validateTagTypeDefinition(
 function checkDuplicateStarts(
   tagDef: TagDefinition,
   index: number | undefined,
-  pattern: string | undefined,
+  _pattern: string | undefined,
   filePath: string,
   note = ""
 ): void {
@@ -417,6 +423,187 @@ function checkDuplicateStarts(
       seenStarts.set(def.start, location);
     }
   }
+}
+
+function validateQuestionsArray(
+  value: unknown,
+  filePath: string
+): QuestionDefinition[] | undefined {
+  if (value === undefined) return undefined;
+
+  if (!Array.isArray(value)) {
+    throw new KatazomeError(
+      `Setting file "${filePath}": "questions" must be an array.`
+    );
+  }
+
+  const questions = value.map((item, i) =>
+    validateQuestionDefinition(item, filePath, `questions[${i}]`)
+  );
+
+  const seenNames = new Set<string>();
+  for (const q of questions) {
+    if (seenNames.has(q.name)) {
+      throw new KatazomeError(
+        `Setting file "${filePath}": duplicate question name "${q.name}" in questions.`
+      );
+    }
+    seenNames.add(q.name);
+  }
+
+  return questions;
+}
+
+function validateQuestionDefinition(
+  value: unknown,
+  filePath: string,
+  location: string
+): QuestionDefinition {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new KatazomeError(
+      `Setting file "${filePath}": ${location} must be an object.`
+    );
+  }
+
+  const obj = value as Record<string, unknown>;
+
+  if (typeof obj["name"] !== "string" || obj["name"].length === 0) {
+    throw new KatazomeError(
+      `Setting file "${filePath}": ${location}.name must be a non-empty string.`
+    );
+  }
+  const name = obj["name"];
+
+  const kind = obj["kind"];
+  if (kind !== "text" && kind !== "select") {
+    throw new KatazomeError(
+      `Setting file "${filePath}": ${location}.kind must be "text" or "select".`
+    );
+  }
+
+  if (typeof obj["message"] !== "string" || obj["message"].length === 0) {
+    throw new KatazomeError(
+      `Setting file "${filePath}": ${location}.message must be a non-empty string.`
+    );
+  }
+  const message = obj["message"];
+
+  if (kind === "text") {
+    return validateQuestionTextDefinition(obj, name, message, filePath, location);
+  } else {
+    return validateQuestionSelectDefinition(obj, name, message, filePath, location);
+  }
+}
+
+function validateQuestionTextDefinition(
+  obj: Record<string, unknown>,
+  name: string,
+  message: string,
+  filePath: string,
+  location: string
+): QuestionTextDefinition {
+  warnUnknownKeys(obj, ["name", "kind", "message", "type", "default"], filePath, location);
+
+  if ("options" in obj) {
+    throw new KatazomeError(
+      `Setting file "${filePath}": ${location} with kind "text" must not have "options".`
+    );
+  }
+
+  const type = obj["type"];
+  if (type !== "string" && type !== "number") {
+    throw new KatazomeError(
+      `Setting file "${filePath}": ${location}.type must be "string" or "number".`
+    );
+  }
+
+  const result: QuestionTextDefinition = { name, kind: "text", type, message };
+
+  if ("default" in obj) {
+    const def = obj["default"];
+    if (typeof def !== "string" && typeof def !== "number") {
+      throw new KatazomeError(
+        `Setting file "${filePath}": ${location}.default must be a string or number.`
+      );
+    }
+    result.default = def;
+  }
+
+  return result;
+}
+
+function validateQuestionSelectDefinition(
+  obj: Record<string, unknown>,
+  name: string,
+  message: string,
+  filePath: string,
+  location: string
+): QuestionSelectDefinition {
+  warnUnknownKeys(obj, ["name", "kind", "message", "options", "default"], filePath, location);
+
+  if ("type" in obj) {
+    throw new KatazomeError(
+      `Setting file "${filePath}": ${location} with kind "select" must not have "type".`
+    );
+  }
+
+  const result: QuestionSelectDefinition = {
+    name,
+    kind: "select",
+    message,
+    options: validateQuestionOptions(obj["options"], filePath, `${location}.options`),
+  };
+
+  if ("default" in obj) {
+    result.default = obj["default"];
+  }
+
+  return result;
+}
+
+function validateQuestionOptions(
+  value: unknown,
+  filePath: string,
+  location: string
+): QuestionOptionDefinition[] {
+  if (!Array.isArray(value) || value.length === 0) {
+    throw new KatazomeError(
+      `Setting file "${filePath}": "${location}" must be a non-empty array.`
+    );
+  }
+
+  return value.map((item, i) =>
+    validateQuestionOption(item, filePath, `${location}[${i}]`)
+  );
+}
+
+function validateQuestionOption(
+  value: unknown,
+  filePath: string,
+  location: string
+): QuestionOptionDefinition {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new KatazomeError(
+      `Setting file "${filePath}": ${location} must be an object.`
+    );
+  }
+
+  const obj = value as Record<string, unknown>;
+  warnUnknownKeys(obj, ["label", "value"], filePath, location);
+
+  if (typeof obj["label"] !== "string" || obj["label"].length === 0) {
+    throw new KatazomeError(
+      `Setting file "${filePath}": ${location}.label must be a non-empty string.`
+    );
+  }
+
+  if (!("value" in obj)) {
+    throw new KatazomeError(
+      `Setting file "${filePath}": ${location}.value is required.`
+    );
+  }
+
+  return { label: obj["label"], value: obj["value"] };
 }
 
 function warnUnknownKeys(

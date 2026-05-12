@@ -19,10 +19,12 @@ import {
 import { KatazomeError } from "../errors.ts";
 import { writeSession, type TranspileSession } from "../session.ts";
 import { CLI_VERSION } from "../version.ts";
+import { parseCliAnswers, resolveAnswers } from "../questions/resolver.ts";
 
 export interface TranspileOptions {
   setting?: string;
   input?: string;
+  answers?: string[];
   runtime?: string;
   session?: string;
   templatePath: string;
@@ -37,6 +39,9 @@ export async function runTranspile(options: TranspileOptions): Promise<void> {
   const settingPath = resolveSettingPath(options.setting, options.templatePath);
   const setting = await loadSetting(settingPath);
   const inputData = options.input !== undefined ? await loadInput(options.input) : {};
+
+  const cliAnswers = parseCliAnswers(options.answers ?? []);
+  const isInteractive = process.stdin.isTTY === true;
 
   const templateAbs = resolve(options.templatePath);
   const settingAbs = resolve(settingPath);
@@ -66,13 +71,15 @@ export async function runTranspile(options: TranspileOptions): Promise<void> {
       rmSync(outputAbs, { recursive: true });
     }
 
+    const answerData = await resolveAnswers(setting.questions ?? [], cliAnswers, isInteractive);
+
     // Determine runtime path: --runtime or <outputDir>/ktzm-runtime.ts
     const runtimePath = options.runtime
       ? resolve(options.runtime)
       : join(outputAbs, "ktzm-runtime.ts");
 
     ensureDir(runtimePath);
-    writeFileSync(runtimePath, generateRuntimeContent(inputData), "utf-8");
+    writeFileSync(runtimePath, generateRuntimeContent(inputData, answerData), "utf-8");
 
     const files = walkDirectory(templateAbs);
     for (const file of files) {
@@ -148,13 +155,15 @@ export async function runTranspile(options: TranspileOptions): Promise<void> {
       }
     }
 
+    const answerData = await resolveAnswers(setting.questions ?? [], cliAnswers, isInteractive);
+
     // Determine runtime path: --runtime or same dir as transpiled file
     const runtimePath = options.runtime
       ? resolve(options.runtime)
       : join(dirname(outputAbs), "ktzm-runtime.ts");
 
     ensureDir(runtimePath);
-    writeFileSync(runtimePath, generateRuntimeContent(inputData), "utf-8");
+    writeFileSync(runtimePath, generateRuntimeContent(inputData, answerData), "utf-8");
 
     await transpileFile(
       templateAbs,
