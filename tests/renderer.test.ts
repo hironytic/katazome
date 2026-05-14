@@ -98,10 +98,15 @@ describe("render", () => {
       // A transpilate that throws at runtime
       const badTranspilate = `
 /*ktzm:appended{*/
-import ktzm from "./ktzm-runtime.ts";
+import { runKatazome } from "./ktzm-runtime.ts";
+runKatazome(async (ktzm) => {
 /*}ktzm*/
 
 throw new Error("intentional error");
+
+/*ktzm:appended{*/
+});
+/*}ktzm*/
 `;
       await expect(render(badTranspilate, {}, {}, { kind: "file", outputFilePath: outputPath, initialRelativePath: "output.txt" })).rejects.toThrow();
     });

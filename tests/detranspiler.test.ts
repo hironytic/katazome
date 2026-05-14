@@ -95,12 +95,17 @@ describe("detranspile", () => {
   test("detranspiles code tag marking directly", () => {
     // The literal "\n" after the code tag becomes ktzm.out("\n") in transpilate.
     const transpilate = `/*ktzm:appended{*/
-import ktzm from "./ktzm-runtime.ts";
+import { runKatazome } from "./ktzm-runtime.ts";
+runKatazome(async (ktzm) => {
 /*}ktzm*/
 
 /*ktzm:code(0){*/ const x = 1; /*}ktzm*/
 ktzm.out("\\n");
 ktzm.out("hello\\n");
+
+/*ktzm:appended{*/
+});
+/*}ktzm*/
 `;
     const result = detranspile(transpilate, cTagDef);
     expect(result).toBe("/*{% const x = 1; %}*/\nhello\n");
@@ -108,10 +113,15 @@ ktzm.out("hello\\n");
 
   test("detranspiles value tag with index 1", () => {
     const transpilate = `/*ktzm:appended{*/
-import ktzm from "./ktzm-runtime.ts";
+import { runKatazome } from "./ktzm-runtime.ts";
+runKatazome(async (ktzm) => {
 /*}ktzm*/
 
 /*ktzm:value(1){*/ktzm.out(String(expr));/*}ktzm*/
+
+/*ktzm:appended{*/
+});
+/*}ktzm*/
 `;
     const result = detranspile(transpilate, cTagDef);
     expect(result).toBe('_V("expr")');
@@ -121,7 +131,7 @@ import ktzm from "./ktzm-runtime.ts";
     // Trimmed whitespace is stored verbatim inside ktzm:trimmed comments.
     // Template: "Hello    \n/*{%- for ... -%}*/\nline\n/*{%- } -%}*/\n!"
     // "    \n" is trimmed from after "Hello", "\n" from before/after "line".
-    const transpilate = "/*ktzm:appended{*/\nimport ktzm from \"./ktzm-runtime.ts\";\n/*}ktzm*/\n\n" +
+    const transpilate = "/*ktzm:appended{*/\nimport { runKatazome } from \"./ktzm-runtime.ts\";\nrunKatazome(async (ktzm) => {\n/*}ktzm*/\n\n" +
       "ktzm.out(\"Hello\");\n" +
       "/*ktzm:trimmed{*//*    \n*//*}ktzm*/\n" +
       "/*ktzm:code(1){*/ for (const x of items) { /*}ktzm*/\n" +
@@ -130,7 +140,8 @@ import ktzm from "./ktzm-runtime.ts";
       "/*ktzm:trimmed{*//*\n*//*}ktzm*/\n" +
       "/*ktzm:code(1){*/ } /*}ktzm*/\n" +
       "/*ktzm:trimmed{*//*\n*//*}ktzm*/\n" +
-      "ktzm.out(\"!\");\n";
+      "ktzm.out(\"!\");\n" +
+      "\n/*ktzm:appended{*/\n});\n/*}ktzm*/\n";
     const result = detranspile(transpilate, cTagDef);
     expect(result).toBe("Hello    \n/*{%- for (const x of items) { -%}*/\nline\n/*{%- } -%}*/\n!");
   });

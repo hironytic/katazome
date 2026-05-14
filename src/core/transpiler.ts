@@ -15,11 +15,11 @@ export function transpileTokens(
 ): string {
   const parts: string[] = [];
 
-  let header = `/*ktzm:appended{*/\nimport ktzm from "${runtimeImportPath}";\n`;
+  let header = `/*ktzm:appended{*/\nimport { runKatazome } from "${runtimeImportPath}";\n`;
   for (const imp of userImports) {
     header += `import * as ${imp.as} from "${imp.path}";\n`;
   }
-  header += `/*}ktzm*/\n\n`;
+  header += `runKatazome(async (ktzm) => {\n/*}ktzm*/\n\n`;
   parts.push(header);
 
   // Process each token, applying trim logic for adjacent tag/literal pairs.
@@ -69,6 +69,8 @@ export function transpileTokens(
       parts.push(...generateLiteralLines(text));
     }
   }
+
+  parts.push(`\n/*ktzm:appended{*/\n});\n/*}ktzm*/\n`);
 
   return parts.join("");
 }

@@ -1,5 +1,5 @@
-import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve, sep } from "node:path";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
 import { generateRuntimeContent } from "../runtime/content.ts";
@@ -11,8 +11,7 @@ import { KatazomeError } from "../errors.ts";
  * - "file": output goes to a fixed file path. ktzm.outputFilePath is readable/writable
  *   but does not affect the actual output path.
  * - "directory": output goes to outputDir/ktzm.outputFilePath. The template can change
- *   the output filename by assigning to ktzm.outputFilePath. The renderer validates
- *   the final path and places the file after Worker exit.
+ *   the output filename by assigning to ktzm.outputFilePath.
  */
 export type RenderOutput =
   | { kind: "file"; outputFilePath: string; initialRelativePath: string }
@@ -39,26 +38,12 @@ export async function render(
     const runtimePath = join(tmpDir, "ktzm-runtime.ts");
     const transpilatePath = join(tmpDir, "transpilate.ts");
 
-    let outputEmbed;
-    if (output.kind === "file") {
-      outputEmbed = { kind: "file" as const, filePath: output.outputFilePath, initialRelativePath: output.initialRelativePath };
-    } else {
-      outputEmbed = {
-        kind: "directory" as const,
-        contentTmpPath: join(tmpDir, "output_content"),
-        pathTmpPath: join(tmpDir, "output_filepath"),
-        initialRelativePath: output.initialRelativePath,
-      };
-    }
+    const outputEmbed = output.kind === "file"
+      ? { kind: "file" as const, filePath: output.outputFilePath, initialRelativePath: output.initialRelativePath }
+      : { kind: "directory" as const, outputDir: output.outputDir, initialRelativePath: output.initialRelativePath };
 
     writeFileSync(runtimePath, generateRuntimeContent(inputData, answerData, outputEmbed), "utf-8");
     writeFileSync(transpilatePath, transpilateContent, "utf-8");
-
-    if (output.kind === "file") {
-      // Pre-create the output file so it always exists after render, even if
-      // the template produces no output (the runtime will overwrite it).
-      writeFileSync(output.outputFilePath, "", "utf-8");
-    }
 
     const worker = new Worker(transpilatePath);
     let settled = false;
@@ -83,19 +68,6 @@ export async function render(
         fail(`Template execution failed:\n${event.message}`);
       });
     });
-
-    // For directory mode: validate ktzm.outputFilePath and place the output file.
-    if (output.kind === "directory") {
-      const relativePath = readFileSync(join(tmpDir, "output_filepath"), "utf-8");
-      const resolvedPath = resolve(output.outputDir, relativePath);
-      if (!resolvedPath.startsWith(output.outputDir + sep) && resolvedPath !== output.outputDir) {
-        throw new KatazomeError(
-          `ktzm.outputFilePath resolves outside the output directory: "${relativePath}"`
-        );
-      }
-      mkdirSync(dirname(resolvedPath), { recursive: true });
-      copyFileSync(join(tmpDir, "output_content"), resolvedPath);
-    }
   } finally {
     rmSync(tmpDir, { recursive: true, force: true });
   }
