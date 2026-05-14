@@ -10,6 +10,7 @@ import {
   assertNotSamePath,
   getTagDefForFile,
   isExcluded,
+  isOutputDirectory,
   askConfirmation,
   ensureDir,
   computeRuntimeImportPath,
@@ -46,9 +47,10 @@ export async function runTranspile(options: TranspileOptions): Promise<void> {
   const templateAbs = resolve(options.templatePath);
   const settingAbs = resolve(settingPath);
   const settingDir = dirname(settingAbs);
-  const isDirectory = existsSync(templateAbs) && statSync(templateAbs).isDirectory();
+  const isTemplateDir = existsSync(templateAbs) && statSync(templateAbs).isDirectory();
+  const isOutputDir = options.outputPath !== undefined && isOutputDirectory(options.outputPath);
 
-  if (isDirectory) {
+  if (isTemplateDir) {
     if (options.outputPath === undefined) {
       throw new KatazomeError(
         "Output path is required when the input is a directory."
@@ -124,8 +126,63 @@ export async function runTranspile(options: TranspileOptions): Promise<void> {
         .map((f) => ({ relativePath: f.relativePath })),
     };
     writeSession(sessionPath, sessionData);
+  } else if (isOutputDir) {
+    // Single file input, directory output
+    const outputDirAbs = resolve(options.outputPath!);
+    const outputFileAbs = join(outputDirAbs, `${basename(templateAbs)}.ts`);
+
+    if (templateAbs === settingAbs) {
+      throw new KatazomeError(
+        `The template file is the same as the setting file: "${templateAbs}"`
+      );
+    }
+    assertNotSamePath(templateAbs, outputDirAbs);
+
+    // Confirm before overwriting an existing output file.
+    if (existsSync(outputFileAbs)) {
+      if (!options.force) {
+        const confirmed = await askConfirmation(
+          `Output file "${outputFileAbs}" already exists. Overwrite?`
+        );
+        if (!confirmed) {
+          process.stderr.write("Aborted.\n");
+          return;
+        }
+      }
+    }
+
+    const answerData = await resolveAnswers(setting.questions ?? [], cliAnswers, isInteractive);
+
+    // Determine runtime path: --runtime or <outputDir>/ktzm-runtime.ts
+    const runtimePath = options.runtime
+      ? resolve(options.runtime)
+      : join(outputDirAbs, "ktzm-runtime.ts");
+
+    ensureDir(runtimePath);
+    writeFileSync(runtimePath, generateRuntimeContent(inputData, answerData), "utf-8");
+
+    await transpileFile(
+      templateAbs,
+      outputFileAbs,
+      runtimePath,
+      setting,
+      settingDir,
+    );
+
+    // Write session file after transpilation.
+    const sessionPath = options.session
+      ? resolve(options.session)
+      : join(outputDirAbs, "ktzm-session.json");
+    const sessionData: TranspileSession = {
+      version: CLI_VERSION,
+      settingFile: settingAbs,
+      templatePath: templateAbs,
+      transpilatePath: outputFileAbs,
+      files: [{ relativePath: "" }],
+    };
+    writeSession(sessionPath, sessionData);
   } else {
-    // Single file
+    // Single file input, file output
     const outputAbs = options.outputPath
       ? resolve(options.outputPath)
       : `${templateAbs}.ts`;

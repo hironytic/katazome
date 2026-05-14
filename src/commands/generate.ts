@@ -1,16 +1,17 @@
 import { resolve, join, basename, dirname } from "node:path";
-import { statSync, existsSync } from "node:fs";
+import { mkdirSync, statSync, existsSync } from "node:fs";
 import { loadSetting } from "../config/loader.ts";
 import { loadInput } from "../input/loader.ts";
 import { tokenize } from "../core/tokenizer.ts";
 import { transpileTokens } from "../core/transpiler.ts";
-import { render } from "../core/renderer.ts";
+import { render, type RenderOutput } from "../core/renderer.ts";
 import { walkDirectory } from "../fs/walker.ts";
 import {
   assertNotSamePath,
   getTagDefForFile,
   getExistingFileBehavior,
   isExcluded,
+  isOutputDirectory,
   askExistingFileAction,
   ensureDir,
   resolveImports,
@@ -43,12 +44,22 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
   const settingAbs = resolve(settingPath);
   const settingDir = dirname(settingAbs);
   const outputAbs = resolve(options.outputPath);
-  const isDirectory = existsSync(templateAbs) && statSync(templateAbs).isDirectory();
+  const isTemplateDir = existsSync(templateAbs) && statSync(templateAbs).isDirectory();
+  const isOutputDir = isOutputDirectory(options.outputPath);
+
+  if (!isOutputDir && isTemplateDir) {
+    throw new KatazomeError(
+      `Cannot use a directory as template input with a file output path: "${outputAbs}". Specify a directory as the output path.`
+    );
+  }
 
   assertNotSamePath(templateAbs, outputAbs);
 
-  if (isDirectory) {
-    const files = walkDirectory(templateAbs);
+  if (isOutputDir) {
+    const files = isTemplateDir
+      ? walkDirectory(templateAbs)
+      : [{ absolutePath: templateAbs, relativePath: basename(templateAbs) }];
+
     for (const file of files) {
       if (file.absolutePath === settingAbs) continue;
       if (isExcluded(setting, basename(file.absolutePath))) continue;
@@ -62,7 +73,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
       try {
         await generateFile(
           file.absolutePath,
-          outAbsPath,
+          { kind: "directory", outputDir: outputAbs, initialRelativePath: file.relativePath },
           setting,
           inputData,
           answerData,
@@ -89,7 +100,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
     }
     await generateFile(
       templateAbs,
-      outputAbs,
+      { kind: "file", outputFilePath: outputAbs, initialRelativePath: basename(options.templatePath) },
       setting,
       inputData,
       answerData,
@@ -101,7 +112,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
 
 async function generateFile(
   templatePath: string,
-  outputPath: string,
+  output: RenderOutput,
   setting: ReturnType<typeof loadSetting> extends Promise<infer T> ? T : never,
   inputData: unknown,
   answerData: unknown,
@@ -111,11 +122,16 @@ async function generateFile(
   const filename = basename(templatePath);
   const tagDef = getTagDefForFile(setting, filename);
 
+  // For existingFile checks in directory mode, use the initial output path.
+  const checkPath = output.kind === "file"
+    ? output.outputFilePath
+    : join(output.outputDir, output.initialRelativePath);
+
   const behavior = getExistingFileBehavior(setting, filename);
-  if (behavior !== "overwrite" && existsSync(outputPath)) {
+  if (behavior !== "overwrite" && existsSync(checkPath)) {
     if (behavior === "error") {
       throw new KatazomeError(
-        `Output file already exists: "${outputPath}". Use a different existingFile setting to allow overwriting or skipping.`
+        `Output file already exists: "${checkPath}". Use a different existingFile setting to allow overwriting or skipping.`
       );
     }
     if (behavior === "skip") return;
@@ -124,7 +140,7 @@ async function generateFile(
       if (action === "skip") return;
       if (action === "error") {
         throw new KatazomeError(
-          `Output file already exists: "${outputPath}".`
+          `Output file already exists: "${checkPath}".`
         );
       }
     }
@@ -142,6 +158,10 @@ async function generateFile(
   // For generate, the runtime import path doesn't matter (temp files in same dir).
   const transpilate = transpileTokens(tokens, "./ktzm-runtime.ts", userImports);
 
-  ensureDir(outputPath);
-  await render(transpilate, inputData, answerData, outputPath);
+  if (output.kind === "file") {
+    ensureDir(output.outputFilePath);
+  } else {
+    mkdirSync(output.outputDir, { recursive: true });
+  }
+  await render(transpilate, inputData, answerData, output);
 }
