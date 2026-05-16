@@ -126,17 +126,33 @@ export async function runTranspile(options: TranspileOptions): Promise<void> {
         .map((f) => ({ relativePath: f.relativePath })),
     };
     writeSession(sessionPath, sessionData);
-  } else if (isOutputDir) {
-    // Single file input, directory output
-    const outputDirAbs = resolve(options.outputPath!);
-    const outputFileAbs = join(outputDirAbs, `${basename(templateAbs)}.ts`);
+  } else {
+    // Single file input (directory output or file output)
+
+    // Determine output paths based on mode.
+    let outputFileAbs: string;
+    let outputDirAbs: string;
+    if (isOutputDir) {
+      outputDirAbs = resolve(options.outputPath!);
+      outputFileAbs = join(outputDirAbs, `${basename(templateAbs)}.ts`);
+    } else {
+      outputFileAbs = options.outputPath
+        ? resolve(options.outputPath)
+        : `${templateAbs}.ts`;
+      outputDirAbs = dirname(outputFileAbs);
+    }
 
     if (templateAbs === settingAbs) {
       throw new KatazomeError(
         `The template file is the same as the setting file: "${templateAbs}"`
       );
     }
-    assertNotSamePath(templateAbs, outputDirAbs);
+    if (outputFileAbs === settingAbs) {
+      throw new KatazomeError(
+        `Output path conflicts with the setting file: "${outputFileAbs}"`
+      );
+    }
+    assertNotSamePath(templateAbs, outputFileAbs);
 
     // Confirm before overwriting an existing output file.
     if (existsSync(outputFileAbs)) {
@@ -178,67 +194,6 @@ export async function runTranspile(options: TranspileOptions): Promise<void> {
       settingFile: settingAbs,
       templatePath: templateAbs,
       transpilatePath: outputFileAbs,
-      files: [{ relativePath: "" }],
-    };
-    writeSession(sessionPath, sessionData);
-  } else {
-    // Single file input, file output
-    const outputAbs = options.outputPath
-      ? resolve(options.outputPath)
-      : `${templateAbs}.ts`;
-
-    if (templateAbs === settingAbs) {
-      throw new KatazomeError(
-        `The template file is the same as the setting file: "${templateAbs}"`
-      );
-    }
-    if (outputAbs === settingAbs) {
-      throw new KatazomeError(
-        `Output path conflicts with the setting file: "${outputAbs}"`
-      );
-    }
-    assertNotSamePath(templateAbs, outputAbs);
-
-    // Confirm before overwriting an existing output file.
-    if (existsSync(outputAbs)) {
-      if (!options.force) {
-        const confirmed = await askConfirmation(
-          `Output file "${outputAbs}" already exists. Overwrite?`
-        );
-        if (!confirmed) {
-          process.stderr.write("Aborted.\n");
-          return;
-        }
-      }
-    }
-
-    const answerData = await resolveAnswers(setting.questions ?? [], cliAnswers, isInteractive);
-
-    // Determine runtime path: --runtime or same dir as transpiled file
-    const runtimePath = options.runtime
-      ? resolve(options.runtime)
-      : join(dirname(outputAbs), "ktzm-runtime.ts");
-
-    ensureDir(runtimePath);
-    writeFileSync(runtimePath, generateRuntimeContent(inputData, answerData, { kind: "stdout" }), "utf-8");
-
-    await transpileFile(
-      templateAbs,
-      outputAbs,
-      runtimePath,
-      setting,
-      settingDir,
-    );
-
-    // Write session file after transpilation.
-    const sessionPath = options.session
-      ? resolve(options.session)
-      : join(dirname(outputAbs), "ktzm-session.json");
-    const sessionData: TranspileSession = {
-      version: CLI_VERSION,
-      settingFile: settingAbs,
-      templatePath: templateAbs,
-      transpilatePath: outputAbs,
       files: [{ relativePath: "" }],
     };
     writeSession(sessionPath, sessionData);
