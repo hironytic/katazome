@@ -602,7 +602,7 @@ describe("runGenerate output directory mode (file input)", () => {
     });
   });
 
-  test("throws when directory input with non-directory output path", async () => {
+  test("throws when directory input with existing file as output path", async () => {
     await withTempDir(async (dir) => {
       const inputDir = join(dir, "src");
       const outputPath = join(dir, "output.txt");
@@ -610,6 +610,7 @@ describe("runGenerate output directory mode (file input)", () => {
 
       writeFileSync(join(inputDir, "ktzm-setting.json"), settingJson, "utf-8");
       writeFileSync(join(inputDir, "hello.txt"), "hello\n", "utf-8");
+      writeFileSync(outputPath, "existing content\n", "utf-8");
 
       await expect(
         runGenerate({ templatePath: inputDir, outputPath })

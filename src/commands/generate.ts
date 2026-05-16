@@ -41,16 +41,16 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
   const setting = await loadSetting(settingPath);
   const inputData = options.input !== undefined ? await loadInput(options.input) : {};
 
-  const cliAnswers = parseCliAnswers(options.answers ?? []);
-  const isInteractive = process.stdin.isTTY === true;
-  const answerData = await resolveAnswers(setting.questions ?? [], cliAnswers, isInteractive);
-
+  // Resolve and validate paths before prompting the user for answers, so that
+  // configuration errors are caught before the user spends time answering questions.
   const templateAbs = resolve(options.templatePath);
   const settingAbs = resolve(settingPath);
   const settingDir = dirname(settingAbs);
   const outputAbs = resolve(options.outputPath);
   const isTemplateDir = existsSync(templateAbs) && statSync(templateAbs).isDirectory();
-  const isOutputDir = isOutputDirectory(options.outputPath);
+  // When the template input is a directory and the output path does not yet exist,
+  // treat it as a directory target without requiring a trailing slash.
+  const isOutputDir = isOutputDirectory(options.outputPath) || (isTemplateDir && !existsSync(outputAbs));
 
   if (!isOutputDir && isTemplateDir) {
     throw new KatazomeError(
@@ -59,6 +59,10 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
   }
 
   assertNotSamePath(templateAbs, outputAbs);
+
+  const cliAnswers = parseCliAnswers(options.answers ?? []);
+  const isInteractive = process.stdin.isTTY === true;
+  const answerData = await resolveAnswers(setting.questions ?? [], cliAnswers, isInteractive);
 
   if (isOutputDir) {
     const files = isTemplateDir
