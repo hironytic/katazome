@@ -1,21 +1,27 @@
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, join, resolve, sep } from "node:path";
 import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
 import { generateRuntimeContent } from "../runtime/content.ts";
 import { KatazomeError } from "../errors.ts";
+import { askExistingFileAction } from "../commands/utils.ts";
+import type { ExistingFileBehavior } from "../types.ts";
 
 /**
  * Describes how the output is directed when rendering a template.
  *
+ * existingFileBehavior controls what happens when the output file already exists:
  * - "file": output goes to a fixed file path. ktzm.outputFilePath is readable/writable
- *   but does not affect the actual output path.
+ *   but does not affect the actual output path. existingFileBehavior is checked by
+ *   the renderer before running the Worker.
  * - "directory": output goes to outputDir/ktzm.outputFilePath. The template can change
  *   the output filename by assigning to ktzm.outputFilePath.
+ *   "overwrite"/"skip"/"error" are handled inside the runtime after the path is
+ *   determined; "prompt" is handled by the renderer after Worker exit.
  */
 export type RenderOutput =
-  | { kind: "file"; outputFilePath: string; initialRelativePath: string }
-  | { kind: "directory"; outputDir: string; initialRelativePath: string };
+  | { kind: "file"; outputFilePath: string; initialRelativePath: string; existingFileBehavior: ExistingFileBehavior; displayName: string }
+  | { kind: "directory"; outputDir: string; initialRelativePath: string; existingFileBehavior: ExistingFileBehavior; displayName: string };
 
 /**
  * Renders a transpilate by running it in a Worker thread.
@@ -31,6 +37,26 @@ export async function render(
   answerData: unknown,
   output: RenderOutput
 ): Promise<void> {
+  // For file mode: check existingFile before running the Worker (output path is fixed).
+  if (output.kind === "file") {
+    const behavior = output.existingFileBehavior;
+    if (behavior !== "overwrite" && existsSync(output.outputFilePath)) {
+      if (behavior === "error") {
+        throw new KatazomeError(
+          `Output file already exists: "${output.outputFilePath}". Use a different existingFile setting to allow overwriting or skipping.`
+        );
+      }
+      if (behavior === "skip") return;
+      if (behavior === "prompt") {
+        const action = await askExistingFileAction(output.displayName);
+        if (action === "skip") return;
+        if (action === "error") {
+          throw new KatazomeError(`Output file already exists: "${output.outputFilePath}".`);
+        }
+      }
+    }
+  }
+
   const tmpDir = join(tmpdir(), `ktzm-${randomUUID()}`);
   mkdirSync(tmpDir, { recursive: true });
 
@@ -38,9 +64,27 @@ export async function render(
     const runtimePath = join(tmpDir, "ktzm-runtime.ts");
     const transpilatePath = join(tmpDir, "transpilate.ts");
 
-    const outputEmbed = output.kind === "file"
-      ? { kind: "file" as const, filePath: output.outputFilePath, initialRelativePath: output.initialRelativePath }
-      : { kind: "directory" as const, outputDir: output.outputDir, initialRelativePath: output.initialRelativePath };
+    const isPrompt = output.kind === "directory" && output.existingFileBehavior === "prompt";
+
+    let outputEmbed;
+    if (output.kind === "file") {
+      outputEmbed = { kind: "file" as const, filePath: output.outputFilePath, initialRelativePath: output.initialRelativePath };
+    } else if (isPrompt) {
+      outputEmbed = {
+        kind: "directory-prompt" as const,
+        outputDir: output.outputDir,
+        contentTmpPath: join(tmpDir, "output_content"),
+        pathTmpPath: join(tmpDir, "output_filepath"),
+        initialRelativePath: output.initialRelativePath,
+      };
+    } else {
+      outputEmbed = {
+        kind: "directory" as const,
+        outputDir: output.outputDir,
+        initialRelativePath: output.initialRelativePath,
+        existingFileBehavior: output.existingFileBehavior as "overwrite" | "skip" | "error",
+      };
+    }
 
     writeFileSync(runtimePath, generateRuntimeContent(inputData, answerData, outputEmbed), "utf-8");
     writeFileSync(transpilatePath, transpilateContent, "utf-8");
@@ -68,6 +112,33 @@ export async function render(
         fail(`Template execution failed:\n${event.message}`);
       });
     });
+
+    // For directory "prompt" mode: read the final path, ask the user, then copy.
+    if (isPrompt && output.kind === "directory") {
+      const relativePath = readFileSync(join(tmpDir, "output_filepath"), "utf-8");
+      const resolvedPath = resolve(output.outputDir, relativePath);
+      if (!resolvedPath.startsWith(output.outputDir + sep) && resolvedPath !== output.outputDir) {
+        throw new KatazomeError(
+          `ktzm.outputFilePath resolves outside the output directory: "${relativePath}"`
+        );
+      }
+
+      const contentTmpPath = join(tmpDir, "output_content");
+      let shouldWrite = true;
+      if (existsSync(resolvedPath)) {
+        const action = await askExistingFileAction(output.displayName);
+        if (action === "skip") {
+          shouldWrite = false;
+        } else if (action === "error") {
+          throw new KatazomeError(`Output file already exists: "${resolvedPath}".`);
+        }
+      }
+
+      if (shouldWrite) {
+        mkdirSync(dirname(resolvedPath), { recursive: true });
+        copyFileSync(contentTmpPath, resolvedPath);
+      }
+    }
   } finally {
     rmSync(tmpDir, { recursive: true, force: true });
   }

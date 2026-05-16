@@ -12,7 +12,6 @@ import {
   getExistingFileBehavior,
   isExcluded,
   isOutputDirectory,
-  askExistingFileAction,
   ensureDir,
   resolveImports,
   resolveSettingPath,
@@ -27,6 +26,12 @@ export interface GenerateOptions {
   templatePath: string;
   outputPath: string;
 }
+
+// Internal type for passing output location to generateFile() before
+// existingFileBehavior is resolved.
+type GenerateTarget =
+  | { kind: "file"; outputFilePath: string; initialRelativePath: string }
+  | { kind: "directory"; outputDir: string; initialRelativePath: string };
 
 /**
  * Runs the `generate` command: renders a template file (or directory) to the final output.
@@ -112,7 +117,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
 
 async function generateFile(
   templatePath: string,
-  output: RenderOutput,
+  target: GenerateTarget,
   setting: ReturnType<typeof loadSetting> extends Promise<infer T> ? T : never,
   inputData: unknown,
   answerData: unknown,
@@ -121,30 +126,14 @@ async function generateFile(
 ): Promise<void> {
   const filename = basename(templatePath);
   const tagDef = getTagDefForFile(setting, filename);
-
-  // For existingFile checks in directory mode, use the initial output path.
-  const checkPath = output.kind === "file"
-    ? output.outputFilePath
-    : join(output.outputDir, output.initialRelativePath);
-
   const behavior = getExistingFileBehavior(setting, filename);
-  if (behavior !== "overwrite" && existsSync(checkPath)) {
-    if (behavior === "error") {
-      throw new KatazomeError(
-        `Output file already exists: "${checkPath}". Use a different existingFile setting to allow overwriting or skipping.`
-      );
-    }
-    if (behavior === "skip") return;
-    if (behavior === "prompt") {
-      const action = await askExistingFileAction(displayName);
-      if (action === "skip") return;
-      if (action === "error") {
-        throw new KatazomeError(
-          `Output file already exists: "${checkPath}".`
-        );
-      }
-    }
-  }
+
+  // Pass existingFileBehavior and displayName to render() for both modes.
+  // File mode: render() checks before running the Worker (output path is fixed).
+  // Directory mode: the actual output path is determined by ktzm.outputFilePath at
+  // runtime, so existingFile is handled inside the runtime or by the renderer after
+  // Worker exit ("prompt").
+  const renderOutput: RenderOutput = { ...target, existingFileBehavior: behavior, displayName };
 
   let templateContent: string;
   try {
@@ -158,10 +147,10 @@ async function generateFile(
   // For generate, the runtime import path doesn't matter (temp files in same dir).
   const transpilate = transpileTokens(tokens, "./ktzm-runtime.ts", userImports);
 
-  if (output.kind === "file") {
-    ensureDir(output.outputFilePath);
+  if (target.kind === "file") {
+    ensureDir(target.outputFilePath);
   } else {
-    mkdirSync(output.outputDir, { recursive: true });
+    mkdirSync(target.outputDir, { recursive: true });
   }
-  await render(transpilate, inputData, answerData, output);
+  await render(transpilate, inputData, answerData, renderOutput);
 }

@@ -269,6 +269,56 @@ describe("runGenerate existingFile behavior", () => {
       ).rejects.toThrow(KatazomeError);
     });
   });
+
+  test("existingFile: skip in directory mode skips files that already exist at their actual output path", async () => {
+    await withTempDir(async (dir) => {
+      const outputDir = join(dir, "out");
+      mkdirSync(outputDir, { recursive: true });
+
+      // Template renames itself to "renamed.txt" via ktzm.outputFilePath
+      const setting = { existingFile: "skip", ...JSON.parse(settingJson) };
+      writeFileSync(join(dir, "ktzm-setting.json"), JSON.stringify(setting), "utf-8");
+      writeFileSync(join(dir, "hello.txt"), "/*{% ktzm.outputFilePath = 'renamed.txt'; %}*/new content\n", "utf-8");
+      writeFileSync(join(outputDir, "renamed.txt"), "old content\n", "utf-8");
+
+      await runGenerate({ templatePath: join(dir, "hello.txt"), outputPath: outputDir + "/" });
+
+      // renamed.txt already exists, so it should be skipped
+      expect(await Bun.file(join(outputDir, "renamed.txt")).text()).toBe("old content\n");
+    });
+  });
+
+  test("existingFile: error in directory mode errors on the actual output path", async () => {
+    await withTempDir(async (dir) => {
+      const outputDir = join(dir, "out");
+      mkdirSync(outputDir, { recursive: true });
+
+      const setting = { existingFile: "error", ...JSON.parse(settingJson) };
+      writeFileSync(join(dir, "ktzm-setting.json"), JSON.stringify(setting), "utf-8");
+      writeFileSync(join(dir, "hello.txt"), "/*{% ktzm.outputFilePath = 'renamed.txt'; %}*/new content\n", "utf-8");
+      writeFileSync(join(outputDir, "renamed.txt"), "old content\n", "utf-8");
+
+      await expect(
+        runGenerate({ templatePath: join(dir, "hello.txt"), outputPath: outputDir + "/" })
+      ).rejects.toThrow(KatazomeError);
+    });
+  });
+
+  test("existingFile: overwrite in directory mode overwrites the actual output path", async () => {
+    await withTempDir(async (dir) => {
+      const outputDir = join(dir, "out");
+      mkdirSync(outputDir, { recursive: true });
+
+      const setting = { existingFile: "overwrite", ...JSON.parse(settingJson) };
+      writeFileSync(join(dir, "ktzm-setting.json"), JSON.stringify(setting), "utf-8");
+      writeFileSync(join(dir, "hello.txt"), "/*{% ktzm.outputFilePath = 'renamed.txt'; %}*/new content\n", "utf-8");
+      writeFileSync(join(outputDir, "renamed.txt"), "old content\n", "utf-8");
+
+      await runGenerate({ templatePath: join(dir, "hello.txt"), outputPath: outputDir + "/" });
+
+      expect(await Bun.file(join(outputDir, "renamed.txt")).text()).toBe("new content\n");
+    });
+  });
 });
 
 describe("runGenerate exclude", () => {

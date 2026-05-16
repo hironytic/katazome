@@ -36,7 +36,7 @@ describe("render", () => {
     await withTempDir(async (dir) => {
       const outputPath = join(dir, "output.txt");
       const transpilate = makeTranspilate("hello world\n");
-      await render(transpilate, {}, {}, { kind: "file", outputFilePath: outputPath, initialRelativePath: "output.txt" });
+      await render(transpilate, {}, {}, { kind: "file", outputFilePath: outputPath, initialRelativePath: "output.txt", existingFileBehavior: "overwrite", displayName: "output.txt" });
       const content = await Bun.file(outputPath).text();
       expect(content).toBe("hello world\n");
     });
@@ -47,7 +47,7 @@ describe("render", () => {
       const outputPath = join(dir, "output.txt");
       const template = "/*{% const name = ktzm.input.name; %}*/Hello _V_name_!";
       const transpilate = makeTranspilate(template);
-      await render(transpilate, { name: "World" }, {}, { kind: "file", outputFilePath: outputPath, initialRelativePath: "output.txt" });
+      await render(transpilate, { name: "World" }, {}, { kind: "file", outputFilePath: outputPath, initialRelativePath: "output.txt", existingFileBehavior: "overwrite", displayName: "output.txt" });
       const content = await Bun.file(outputPath).text();
       expect(content).toBe("Hello World!");
     });
@@ -59,7 +59,7 @@ describe("render", () => {
       // trim:"both" on for/} tags removes the \n before and after each item
       const template = "/*{%- for (const item of ktzm.input.items) { -%}*/\n_V_item_\n/*{%- } -%}*/";
       const transpilate = makeTranspilate(template);
-      await render(transpilate, { items: ["a", "b", "c"] }, {}, { kind: "file", outputFilePath: outputPath, initialRelativePath: "output.txt" });
+      await render(transpilate, { items: ["a", "b", "c"] }, {}, { kind: "file", outputFilePath: outputPath, initialRelativePath: "output.txt", existingFileBehavior: "overwrite", displayName: "output.txt" });
       const content = await Bun.file(outputPath).text();
       // Each item is output without surrounding newlines because of trim:"both"
       expect(content).toBe("abc");
@@ -72,7 +72,7 @@ describe("render", () => {
       // Use non-trim tags to preserve newlines
       const template = "/*{% for (const item of ktzm.input.items) { %}*/_V_item_\n/*{% } %}*/";
       const transpilate = makeTranspilate(template);
-      await render(transpilate, { items: ["a", "b", "c"] }, {}, { kind: "file", outputFilePath: outputPath, initialRelativePath: "output.txt" });
+      await render(transpilate, { items: ["a", "b", "c"] }, {}, { kind: "file", outputFilePath: outputPath, initialRelativePath: "output.txt", existingFileBehavior: "overwrite", displayName: "output.txt" });
       const content = await Bun.file(outputPath).text();
       expect(content).toBe("a\nb\nc\n");
     });
@@ -82,7 +82,7 @@ describe("render", () => {
     await withTempDir(async (dir) => {
       const outputPath = join(dir, "output.txt");
       const transpilate = makeTranspilate("");
-      await render(transpilate, {}, {}, { kind: "file", outputFilePath: outputPath, initialRelativePath: "output.txt" });
+      await render(transpilate, {}, {}, { kind: "file", outputFilePath: outputPath, initialRelativePath: "output.txt", existingFileBehavior: "overwrite", displayName: "output.txt" });
       // File should exist and be empty
       const file = Bun.file(outputPath);
       const exists = await file.exists();
@@ -108,7 +108,7 @@ throw new Error("intentional error");
 });
 /*}ktzm*/
 `;
-      await expect(render(badTranspilate, {}, {}, { kind: "file", outputFilePath: outputPath, initialRelativePath: "output.txt" })).rejects.toThrow();
+      await expect(render(badTranspilate, {}, {}, { kind: "file", outputFilePath: outputPath, initialRelativePath: "output.txt", existingFileBehavior: "overwrite", displayName: "output.txt" })).rejects.toThrow();
     });
   });
 });
