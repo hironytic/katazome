@@ -81,7 +81,7 @@ export async function runTranspile(options: TranspileOptions): Promise<void> {
       : join(outputAbs, "ktzm-runtime.ts");
 
     ensureDir(runtimePath);
-    writeFileSync(runtimePath, generateRuntimeContent(inputData, answerData), "utf-8");
+    writeFileSync(runtimePath, generateRuntimeContent(inputData, answerData, { kind: "stdout" }), "utf-8");
 
     const files = walkDirectory(templateAbs);
     for (const file of files) {
@@ -159,7 +159,7 @@ export async function runTranspile(options: TranspileOptions): Promise<void> {
       : join(outputDirAbs, "ktzm-runtime.ts");
 
     ensureDir(runtimePath);
-    writeFileSync(runtimePath, generateRuntimeContent(inputData, answerData), "utf-8");
+    writeFileSync(runtimePath, generateRuntimeContent(inputData, answerData, { kind: "stdout" }), "utf-8");
 
     await transpileFile(
       templateAbs,
@@ -220,7 +220,7 @@ export async function runTranspile(options: TranspileOptions): Promise<void> {
       : join(dirname(outputAbs), "ktzm-runtime.ts");
 
     ensureDir(runtimePath);
-    writeFileSync(runtimePath, generateRuntimeContent(inputData, answerData), "utf-8");
+    writeFileSync(runtimePath, generateRuntimeContent(inputData, answerData, { kind: "stdout" }), "utf-8");
 
     await transpileFile(
       templateAbs,

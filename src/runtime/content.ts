@@ -27,7 +27,7 @@ export type OutputEmbed =
 export function generateRuntimeContent(
   inputData: unknown,
   answerData: unknown,
-  outputEmbed: OutputEmbed = { kind: "stdout" },
+  outputEmbed: OutputEmbed,
 ): string {
   const inputJson = JSON.stringify(inputData ?? {});
   const answerJson = JSON.stringify(answerData ?? {});
