@@ -34,7 +34,8 @@ describe("escapeString", () => {
 describe("transpileTokens", () => {
   test("header is always prepended", () => {
     const result = transpile("");
-    expect(result).toContain(`import ktzm from "${RUNTIME}"`);
+    expect(result).toContain(`import { runKatazome } from "${RUNTIME}"`);
+    expect(result).toContain("runKatazome(async (ktzm) => {");
     expect(result).toContain("/*ktzm:appended{*/");
     expect(result).toContain("/*}ktzm*/");
   });
@@ -119,7 +120,7 @@ describe("transpileTokens", () => {
   test("uses the provided runtimeImportPath", () => {
     const tokens = tokenize("", cTagDef);
     const result = transpileTokens(tokens, "../some/path/runtime.ts");
-    expect(result).toContain('import ktzm from "../some/path/runtime.ts"');
+    expect(result).toContain('import { runKatazome } from "../some/path/runtime.ts"');
   });
 
   test("user imports are emitted inside the appended block", () => {

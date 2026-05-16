@@ -1,17 +1,17 @@
 import { resolve, join, basename, dirname } from "node:path";
-import { statSync, existsSync } from "node:fs";
+import { mkdirSync, statSync, existsSync } from "node:fs";
 import { loadSetting } from "../config/loader.ts";
 import { loadInput } from "../input/loader.ts";
 import { tokenize } from "../core/tokenizer.ts";
 import { transpileTokens } from "../core/transpiler.ts";
-import { render } from "../core/renderer.ts";
+import { render, type RenderOutput } from "../core/renderer.ts";
 import { walkDirectory } from "../fs/walker.ts";
 import {
   assertNotSamePath,
   getTagDefForFile,
   getExistingFileBehavior,
   isExcluded,
-  askExistingFileAction,
+  isOutputDirectory,
   ensureDir,
   resolveImports,
   resolveSettingPath,
@@ -27,6 +27,12 @@ export interface GenerateOptions {
   outputPath: string;
 }
 
+// Internal type for passing output location to generateFile() before
+// existingFileBehavior is resolved.
+type GenerateTarget =
+  | { kind: "file"; outputFilePath: string; initialRelativePath: string }
+  | { kind: "directory"; outputDir: string; initialRelativePath: string };
+
 /**
  * Runs the `generate` command: renders a template file (or directory) to the final output.
  */
@@ -35,20 +41,34 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
   const setting = await loadSetting(settingPath);
   const inputData = options.input !== undefined ? await loadInput(options.input) : {};
 
-  const cliAnswers = parseCliAnswers(options.answers ?? []);
-  const isInteractive = process.stdin.isTTY === true;
-  const answerData = await resolveAnswers(setting.questions ?? [], cliAnswers, isInteractive);
-
+  // Resolve and validate paths before prompting the user for answers, so that
+  // configuration errors are caught before the user spends time answering questions.
   const templateAbs = resolve(options.templatePath);
   const settingAbs = resolve(settingPath);
   const settingDir = dirname(settingAbs);
   const outputAbs = resolve(options.outputPath);
-  const isDirectory = existsSync(templateAbs) && statSync(templateAbs).isDirectory();
+  const isTemplateDir = existsSync(templateAbs) && statSync(templateAbs).isDirectory();
+  // When the template input is a directory and the output path does not yet exist,
+  // treat it as a directory target without requiring a trailing slash.
+  const isOutputDir = isOutputDirectory(options.outputPath) || (isTemplateDir && !existsSync(outputAbs));
+
+  if (!isOutputDir && isTemplateDir) {
+    throw new KatazomeError(
+      `Cannot use a directory as template input with a file output path: "${outputAbs}". Specify a directory as the output path.`
+    );
+  }
 
   assertNotSamePath(templateAbs, outputAbs);
 
-  if (isDirectory) {
-    const files = walkDirectory(templateAbs);
+  const cliAnswers = parseCliAnswers(options.answers ?? []);
+  const isInteractive = process.stdin.isTTY === true;
+  const answerData = await resolveAnswers(setting.questions ?? [], cliAnswers, isInteractive);
+
+  if (isOutputDir) {
+    const files = isTemplateDir
+      ? walkDirectory(templateAbs)
+      : [{ absolutePath: templateAbs, relativePath: basename(templateAbs) }];
+
     for (const file of files) {
       if (file.absolutePath === settingAbs) continue;
       if (isExcluded(setting, basename(file.absolutePath))) continue;
@@ -62,7 +82,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
       try {
         await generateFile(
           file.absolutePath,
-          outAbsPath,
+          { kind: "directory", outputDir: outputAbs, initialRelativePath: file.relativePath },
           setting,
           inputData,
           answerData,
@@ -89,7 +109,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
     }
     await generateFile(
       templateAbs,
-      outputAbs,
+      { kind: "file", outputFilePath: outputAbs, initialRelativePath: basename(options.templatePath) },
       setting,
       inputData,
       answerData,
@@ -101,7 +121,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
 
 async function generateFile(
   templatePath: string,
-  outputPath: string,
+  target: GenerateTarget,
   setting: ReturnType<typeof loadSetting> extends Promise<infer T> ? T : never,
   inputData: unknown,
   answerData: unknown,
@@ -110,25 +130,14 @@ async function generateFile(
 ): Promise<void> {
   const filename = basename(templatePath);
   const tagDef = getTagDefForFile(setting, filename);
-
   const behavior = getExistingFileBehavior(setting, filename);
-  if (behavior !== "overwrite" && existsSync(outputPath)) {
-    if (behavior === "error") {
-      throw new KatazomeError(
-        `Output file already exists: "${outputPath}". Use a different existingFile setting to allow overwriting or skipping.`
-      );
-    }
-    if (behavior === "skip") return;
-    if (behavior === "prompt") {
-      const action = await askExistingFileAction(displayName);
-      if (action === "skip") return;
-      if (action === "error") {
-        throw new KatazomeError(
-          `Output file already exists: "${outputPath}".`
-        );
-      }
-    }
-  }
+
+  // Pass existingFileBehavior and displayName to render() for both modes.
+  // File mode: render() checks before running the Worker (output path is fixed).
+  // Directory mode: the actual output path is determined by ktzm.outputFilePath at
+  // runtime, so existingFile is handled inside the runtime or by the renderer after
+  // Worker exit ("prompt").
+  const renderOutput: RenderOutput = { ...target, existingFileBehavior: behavior, displayName };
 
   let templateContent: string;
   try {
@@ -142,6 +151,10 @@ async function generateFile(
   // For generate, the runtime import path doesn't matter (temp files in same dir).
   const transpilate = transpileTokens(tokens, "./ktzm-runtime.ts", userImports);
 
-  ensureDir(outputPath);
-  await render(transpilate, inputData, answerData, outputPath);
+  if (target.kind === "file") {
+    ensureDir(target.outputFilePath);
+  } else {
+    mkdirSync(target.outputDir, { recursive: true });
+  }
+  await render(transpilate, inputData, answerData, renderOutput);
 }

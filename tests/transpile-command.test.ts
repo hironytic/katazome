@@ -209,6 +209,55 @@ describe("runTranspile error context in directory mode", () => {
   });
 });
 
+describe("runTranspile output directory mode (file input)", () => {
+  test("trailing slash on output path treats it as directory (creates basename.ts)", async () => {
+    await withTempDir(async (dir) => {
+      const templatePath = join(dir, "hello.txt");
+      const outputDir = join(dir, "out");
+
+      writeFileSync(join(dir, "ktzm-setting.json"), settingJson, "utf-8");
+      writeFileSync(templatePath, "hello\n", "utf-8");
+
+      await runTranspile({ templatePath, outputPath: outputDir + "/", force: true });
+
+      expect(existsSync(join(outputDir, "hello.txt.ts"))).toBe(true);
+      expect(existsSync(join(outputDir, "ktzm-runtime.ts"))).toBe(true);
+      expect(existsSync(join(outputDir, "ktzm-session.json"))).toBe(true);
+    });
+  });
+
+  test("existing directory as output path treats it as directory", async () => {
+    await withTempDir(async (dir) => {
+      const templatePath = join(dir, "hello.txt");
+      const outputDir = join(dir, "out");
+      mkdirSync(outputDir, { recursive: true });
+
+      writeFileSync(join(dir, "ktzm-setting.json"), settingJson, "utf-8");
+      writeFileSync(templatePath, "hello\n", "utf-8");
+
+      await runTranspile({ templatePath, outputPath: outputDir, force: true });
+
+      expect(existsSync(join(outputDir, "hello.txt.ts"))).toBe(true);
+    });
+  });
+
+  test("--force overwrites existing output .ts file in directory mode without prompting", async () => {
+    await withTempDir(async (dir) => {
+      const templatePath = join(dir, "hello.txt");
+      const outputDir = join(dir, "out");
+      mkdirSync(outputDir, { recursive: true });
+      writeFileSync(join(outputDir, "hello.txt.ts"), "old content\n", "utf-8");
+
+      writeFileSync(join(dir, "ktzm-setting.json"), settingJson, "utf-8");
+      writeFileSync(templatePath, "hello\n", "utf-8");
+
+      await runTranspile({ templatePath, outputPath: outputDir, force: true });
+
+      expect(await Bun.file(join(outputDir, "hello.txt.ts")).text()).not.toBe("old content\n");
+    });
+  });
+});
+
 describe("runTranspile exclude", () => {
   test("excludes files matching exclude patterns in directory mode", async () => {
     await withTempDir(async (dir) => {

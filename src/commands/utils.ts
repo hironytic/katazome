@@ -137,6 +137,16 @@ export function isExcluded(setting: Setting, filename: string): boolean {
 }
 
 /**
+ * Returns true if the given output path should be treated as a directory target.
+ * A path is a directory target if it ends with "/" or if it points to an existing directory.
+ */
+export function isOutputDirectory(outputPath: string): boolean {
+  if (outputPath.endsWith("/")) return true;
+  const abs = resolve(outputPath);
+  return existsSync(abs) && statSync(abs).isDirectory();
+}
+
+/**
  * Ensures the directory for the given file path exists, creating it if necessary.
  */
 export function ensureDir(filePath: string): void {
