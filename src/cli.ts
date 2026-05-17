@@ -1,4 +1,4 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 import { Command } from "commander";
 import { runGenerate } from "./commands/generate.ts";
 import { runTranspile } from "./commands/transpile.ts";
@@ -19,8 +19,8 @@ program
 program
   .command("generate")
   .description("Transpile and render a template to produce a final output file")
-  .option("--setting <file>", "Path to the setting file (JSON, JSON5, YAML, or TOML; default: ktzm-setting.{json,json5,yaml,toml} next to the template)")
-  .option("--input <file>", "Path to the input data file (JSON, JSON5, YAML, or TOML)")
+  .option("--setting <file>", "Path to the setting file (JSON, JSON5, or YAML; default: ktzm-setting.{json,json5,yaml} next to the template)")
+  .option("--input <file>", "Path to the input data file (JSON, JSON5, or YAML)")
   .option("--answer <name=value>", "Pre-supply an answer to a question (repeatable)", (val: string, prev: string[]) => [...prev, val], [] as string[])
   .argument("<template-file>", "Template file or directory")
   .argument("<output-file>", "Output file or directory")
@@ -40,14 +40,14 @@ program
 program
   .command("transpile")
   .description("Convert a template file to a transpiled file (TypeScript)")
-  .option("--setting <file>", "Path to the setting file (JSON, JSON5, YAML, or TOML; default: ktzm-setting.{json,json5,yaml,toml} next to the template)")
-  .option("--input <file>", "Path to the input data file (JSON, JSON5, YAML, or TOML)")
+  .option("--setting <file>", "Path to the setting file (JSON, JSON5, or YAML; default: ktzm-setting.{json,json5,yaml} next to the template)")
+  .option("--input <file>", "Path to the input data file (JSON, JSON5, or YAML)")
   .option("--answer <name=value>", "Pre-supply an answer to a question (repeatable)", (val: string, prev: string[]) => [...prev, val], [] as string[])
-  .option("--runtime <file>", "Output path for the runtime file (default: ktzm-runtime.ts next to the transpiled file)")
+  .option("--runtime <file>", "Output path for the runtime file (default: ktzm-runtime.mts next to the transpiled file)")
   .option("--session <file>", "Output path for the session file (default: ktzm-session.json next to the transpiled file)")
   .option("--force", "Skip confirmation prompt when the output path already exists")
   .argument("<template-file>", "Template file or directory")
-  .argument("[output-transpiled-file]", "Output transpiled file or directory (default: <template-file>.ts)")
+  .argument("[output-transpiled-file]", "Output transpiled file or directory (default: <template-file>.mts)")
   .action(async (
     templateFile: string,
     outputFile: string | undefined,

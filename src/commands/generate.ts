@@ -1,5 +1,5 @@
 import { resolve, join, basename, dirname } from "node:path";
-import { mkdirSync, statSync, existsSync } from "node:fs";
+import { mkdirSync, statSync, existsSync, readFileSync } from "node:fs";
 import { loadSetting } from "../config/loader.ts";
 import { loadInput } from "../input/loader.ts";
 import { tokenize } from "../core/tokenizer.ts";
@@ -141,7 +141,7 @@ async function generateFile(
 
   let templateContent: string;
   try {
-    templateContent = await Bun.file(templatePath).text();
+    templateContent = readFileSync(templatePath, "utf-8");
   } catch {
     throw new KatazomeError(`Cannot read template file: "${templatePath}"`);
   }
@@ -149,7 +149,7 @@ async function generateFile(
   const tokens = tokenize(templateContent, tagDef);
   const userImports = resolveImports(setting, filename, settingDir);
   // For generate, the runtime import path doesn't matter (temp files in same dir).
-  const transpilate = transpileTokens(tokens, "./ktzm-runtime.ts", userImports);
+  const transpilate = transpileTokens(tokens, "./ktzm-runtime.mts", userImports);
 
   if (target.kind === "file") {
     ensureDir(target.outputFilePath);

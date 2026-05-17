@@ -1,7 +1,7 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { runGenerate } from "../src/commands/generate.ts";
 import { KatazomeError } from "../src/errors.ts";
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
@@ -35,11 +35,11 @@ describe("runGenerate without --setting", () => {
 
       await runGenerate({ templatePath, outputPath });
 
-      expect(await Bun.file(outputPath).text()).toBe("hello world\n");
+      expect(readFileSync(outputPath, "utf-8")).toBe("hello world\n");
     });
   });
 
-  test("prefers json over json5/yaml/toml when multiple candidates exist", async () => {
+  test("prefers json over json5/yaml when multiple candidates exist", async () => {
     await withTempDir(async (dir) => {
       const templatePath = join(dir, "template.txt");
       const outputPath = join(dir, "output.txt");
@@ -51,7 +51,7 @@ describe("runGenerate without --setting", () => {
 
       await runGenerate({ templatePath, outputPath });
 
-      expect(await Bun.file(outputPath).text()).toBe("hello\n");
+      expect(readFileSync(outputPath, "utf-8")).toBe("hello\n");
     });
   });
 
@@ -124,7 +124,7 @@ describe("runGenerate without --input", () => {
 
       await runGenerate({ setting: settingPath, templatePath, outputPath });
 
-      expect(await Bun.file(outputPath).text()).toBe("hello world\n");
+      expect(readFileSync(outputPath, "utf-8")).toBe("hello world\n");
     });
   });
 
@@ -143,7 +143,7 @@ describe("runGenerate without --input", () => {
 
       await runGenerate({ setting: settingPath, templatePath, outputPath });
 
-      expect(await Bun.file(outputPath).text()).toBe("default");
+      expect(readFileSync(outputPath, "utf-8")).toBe("default");
     });
   });
 });
@@ -161,7 +161,7 @@ describe("runGenerate existingFile behavior", () => {
 
       await runGenerate({ setting: settingPath, templatePath, outputPath });
 
-      expect(await Bun.file(outputPath).text()).toBe("new content\n");
+      expect(readFileSync(outputPath, "utf-8")).toBe("new content\n");
     });
   });
 
@@ -177,7 +177,7 @@ describe("runGenerate existingFile behavior", () => {
 
       await runGenerate({ setting: settingPath, templatePath, outputPath });
 
-      expect(await Bun.file(outputPath).text()).toBe("old content\n");
+      expect(readFileSync(outputPath, "utf-8")).toBe("old content\n");
     });
   });
 
@@ -192,7 +192,7 @@ describe("runGenerate existingFile behavior", () => {
 
       await runGenerate({ setting: settingPath, templatePath, outputPath });
 
-      expect(await Bun.file(outputPath).text()).toBe("new content\n");
+      expect(readFileSync(outputPath, "utf-8")).toBe("new content\n");
     });
   });
 
@@ -223,7 +223,7 @@ describe("runGenerate existingFile behavior", () => {
 
       await runGenerate({ setting: settingPath, templatePath, outputPath });
 
-      expect(await Bun.file(outputPath).text()).toBe("new content\n");
+      expect(readFileSync(outputPath, "utf-8")).toBe("new content\n");
     });
   });
 
@@ -247,9 +247,9 @@ describe("runGenerate existingFile behavior", () => {
       await runGenerate({ templatePath: inputDir, outputPath: outputDir });
 
       // "keep.txt" matches the skip pattern — unchanged
-      expect(await Bun.file(join(outputDir, "keep.txt")).text()).toBe("old keep\n");
+      expect(readFileSync(join(outputDir, "keep.txt"), "utf-8")).toBe("old keep\n");
       // "replace.txt" falls through to root "overwrite"
-      expect(await Bun.file(join(outputDir, "replace.txt")).text()).toBe("new replace\n");
+      expect(readFileSync(join(outputDir, "replace.txt"), "utf-8")).toBe("new replace\n");
     });
   });
 
@@ -284,7 +284,7 @@ describe("runGenerate existingFile behavior", () => {
       await runGenerate({ templatePath: join(dir, "hello.txt"), outputPath: outputDir + "/" });
 
       // renamed.txt already exists, so it should be skipped
-      expect(await Bun.file(join(outputDir, "renamed.txt")).text()).toBe("old content\n");
+      expect(readFileSync(join(outputDir, "renamed.txt"), "utf-8")).toBe("old content\n");
     });
   });
 
@@ -316,7 +316,7 @@ describe("runGenerate existingFile behavior", () => {
 
       await runGenerate({ templatePath: join(dir, "hello.txt"), outputPath: outputDir + "/" });
 
-      expect(await Bun.file(join(outputDir, "renamed.txt")).text()).toBe("new content\n");
+      expect(readFileSync(join(outputDir, "renamed.txt"), "utf-8")).toBe("new content\n");
     });
   });
 });
@@ -387,7 +387,7 @@ describe("runGenerate with questions", () => {
         answers: ["propName=hello"],
       });
 
-      expect(await Bun.file(join(dir, "output.txt")).text()).toBe("hello\n");
+      expect(readFileSync(join(dir, "output.txt"), "utf-8")).toBe("hello\n");
     });
   });
 
@@ -416,7 +416,7 @@ describe("runGenerate with questions", () => {
         answers: ["count=21"],
       });
 
-      expect(await Bun.file(join(dir, "output.txt")).text()).toBe("42\n");
+      expect(readFileSync(join(dir, "output.txt"), "utf-8")).toBe("42\n");
     });
   });
 
@@ -453,7 +453,7 @@ describe("runGenerate with questions", () => {
         answers: ["mode=slow"],
       });
 
-      expect(await Bun.file(join(dir, "output.txt")).text()).toBe("slow\n");
+      expect(readFileSync(join(dir, "output.txt"), "utf-8")).toBe("slow\n");
     });
   });
 
@@ -480,7 +480,7 @@ describe("runGenerate with questions", () => {
         outputPath: join(dir, "output.txt"),
       });
 
-      expect(await Bun.file(join(dir, "output.txt")).text()).toBe("hi\n");
+      expect(readFileSync(join(dir, "output.txt"), "utf-8")).toBe("hi\n");
     });
   });
 
@@ -582,7 +582,7 @@ describe("runGenerate output directory mode (file input)", () => {
       await runGenerate({ templatePath, outputPath: outputDir + "/" });
 
       expect(existsSync(join(outputDir, "hello.txt"))).toBe(true);
-      expect(await Bun.file(join(outputDir, "hello.txt")).text()).toBe("hello\n");
+      expect(readFileSync(join(outputDir, "hello.txt"), "utf-8")).toBe("hello\n");
     });
   });
 
@@ -598,7 +598,7 @@ describe("runGenerate output directory mode (file input)", () => {
       await runGenerate({ templatePath, outputPath: outputDir });
 
       expect(existsSync(join(outputDir, "hello.txt"))).toBe(true);
-      expect(await Bun.file(join(outputDir, "hello.txt")).text()).toBe("hello\n");
+      expect(readFileSync(join(outputDir, "hello.txt"), "utf-8")).toBe("hello\n");
     });
   });
 
@@ -630,7 +630,7 @@ describe("runGenerate ktzm.outputFilePath", () => {
 
       await runGenerate({ templatePath, outputPath: outputDir + "/" });
 
-      expect(await Bun.file(join(outputDir, "hello.txt")).text()).toBe("hello.txt");
+      expect(readFileSync(join(outputDir, "hello.txt"), "utf-8")).toBe("hello.txt");
     });
   });
 
@@ -645,7 +645,7 @@ describe("runGenerate ktzm.outputFilePath", () => {
       await runGenerate({ templatePath, outputPath: outputDir + "/" });
 
       expect(existsSync(join(outputDir, "renamed.txt"))).toBe(true);
-      expect(await Bun.file(join(outputDir, "renamed.txt")).text()).toBe("hello\n");
+      expect(readFileSync(join(outputDir, "renamed.txt"), "utf-8")).toBe("hello\n");
       expect(existsSync(join(outputDir, "hello.txt"))).toBe(false);
     });
   });
@@ -661,7 +661,7 @@ describe("runGenerate ktzm.outputFilePath", () => {
       await runGenerate({ templatePath, outputPath: outputDir + "/" });
 
       expect(existsSync(join(outputDir, "sub", "renamed.txt"))).toBe(true);
-      expect(await Bun.file(join(outputDir, "sub", "renamed.txt")).text()).toBe("hello\n");
+      expect(readFileSync(join(outputDir, "sub", "renamed.txt"), "utf-8")).toBe("hello\n");
     });
   });
 
@@ -709,7 +709,7 @@ describe("runGenerate ktzm.outputFilePath", () => {
       await runGenerate({ templatePath, outputPath });
 
       expect(existsSync(outputPath)).toBe(true);
-      expect(await Bun.file(outputPath).text()).toBe("hello\n");
+      expect(readFileSync(outputPath, "utf-8")).toBe("hello\n");
       expect(existsSync(join(dir, "renamed.txt"))).toBe(false);
     });
   });
@@ -724,7 +724,7 @@ describe("runGenerate ktzm.outputFilePath", () => {
 
       await runGenerate({ templatePath, outputPath });
 
-      expect(await Bun.file(outputPath).text()).toBe("hello.txt");
+      expect(readFileSync(outputPath, "utf-8")).toBe("hello.txt");
     });
   });
 
@@ -743,7 +743,7 @@ describe("runGenerate ktzm.outputFilePath", () => {
 
       await runGenerate({ templatePath: inputDir, outputPath: outputDir + "/" });
 
-      expect(await Bun.file(join(outputDir, "sub", "hello.txt")).text()).toBe("sub/hello.txt");
+      expect(readFileSync(join(outputDir, "sub", "hello.txt"), "utf-8")).toBe("sub/hello.txt");
     });
   });
 });
@@ -772,7 +772,7 @@ describe("runGenerate imports", () => {
 
       await runGenerate({ templatePath, outputPath });
 
-      expect(await Bun.file(outputPath).text()).toBe("Hello, world\n");
+      expect(readFileSync(outputPath, "utf-8")).toBe("Hello, world\n");
     });
   });
 });

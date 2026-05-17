@@ -1,4 +1,5 @@
-import { describe, expect, test, spyOn } from "bun:test";
+import { describe, expect, test, vi } from "vitest";
+import { writeFileSync, rmSync } from "node:fs";
 import { loadSetting } from "../src/config/loader.ts";
 import { KatazomeError } from "../src/errors.ts";
 
@@ -16,13 +17,6 @@ describe("loadSetting", () => {
     expect(setting.tagDefinition.code[1]).toEqual({ start: "/*{%-", end: "-%}*/", trim: "both" });
   });
 
-  test("loads .toml setting file", async () => {
-    const setting = await loadSetting(`${fixturesDir}c-style.toml`);
-    expect(setting.tagDefinition.code).toHaveLength(2);
-    expect(setting.tagDefinition.code[0]).toEqual({ start: "/*{%", end: "%}*/" });
-    expect(setting.tagDefinition.code[1]).toEqual({ start: "/*{%-", end: "-%}*/", trim: "both" });
-  });
-
   test("loads .json5 setting file with comments", async () => {
     const setting = await loadSetting(`${fixturesDir}c-style.json5`);
     expect(setting.tagDefinition.code).toHaveLength(2);
@@ -31,13 +25,13 @@ describe("loadSetting", () => {
 
   test("falls back to JSON5 for unknown extension", async () => {
     const settingJson = '{ tagDefinition: { code: [{ start: "<%", end: "%>" }] } }';
-    const tmpPath = `${import.meta.dir}/tmp-unknown-ext.ktzm`;
-    await Bun.write(tmpPath, settingJson);
+    const tmpPath = `${import.meta.dirname}/tmp-unknown-ext.ktzm`;
+    writeFileSync(tmpPath, settingJson, "utf-8");
     try {
       const setting = await loadSetting(tmpPath);
       expect(setting.tagDefinition.code).toHaveLength(1);
     } finally {
-      await Bun.spawn(["rm", "-f", tmpPath]).exited;
+      rmSync(tmpPath, { force: true });
     }
   });
 
@@ -107,13 +101,13 @@ describe("loadSetting", () => {
     const settingJson = JSON.stringify({
       tagDefinition: { code: [{ start: "<%", end: "%>" }] },
     });
-    const tmpPath = `${import.meta.dir}/tmp-no-files.json`;
-    await Bun.write(tmpPath, settingJson);
+    const tmpPath = `${import.meta.dirname}/tmp-no-files.json`;
+    writeFileSync(tmpPath, settingJson, "utf-8");
     try {
       const setting = await loadSetting(tmpPath);
       expect(setting.files).toHaveLength(0);
     } finally {
-      await Bun.spawn(["rm", "-f", tmpPath]).exited;
+      rmSync(tmpPath, { force: true });
     }
   });
 
@@ -130,13 +124,13 @@ describe("loadSetting", () => {
     const settingJson = JSON.stringify({
       existingFile: "skip",
     });
-    const tmpPath = `${import.meta.dir}/tmp-existing-file.json`;
-    await Bun.write(tmpPath, settingJson);
+    const tmpPath = `${import.meta.dirname}/tmp-existing-file.json`;
+    writeFileSync(tmpPath, settingJson, "utf-8");
     try {
       const setting = await loadSetting(tmpPath);
       expect(setting.existingFile).toBe("skip");
     } finally {
-      await Bun.spawn(["rm", "-f", tmpPath]).exited;
+      rmSync(tmpPath, { force: true });
     }
   });
 
@@ -144,24 +138,24 @@ describe("loadSetting", () => {
     const settingJson = JSON.stringify({
       files: [{ pattern: "package.json", existingFile: "skip" }],
     });
-    const tmpPath = `${import.meta.dir}/tmp-per-file-existing.json`;
-    await Bun.write(tmpPath, settingJson);
+    const tmpPath = `${import.meta.dirname}/tmp-per-file-existing.json`;
+    writeFileSync(tmpPath, settingJson, "utf-8");
     try {
       const setting = await loadSetting(tmpPath);
       expect(setting.files[0]?.existingFile).toBe("skip");
     } finally {
-      await Bun.spawn(["rm", "-f", tmpPath]).exited;
+      rmSync(tmpPath, { force: true });
     }
   });
 
   test("throws on invalid existingFile value", async () => {
     const settingJson = JSON.stringify({ existingFile: "replace" });
-    const tmpPath = `${import.meta.dir}/tmp-bad-existing.json`;
-    await Bun.write(tmpPath, settingJson);
+    const tmpPath = `${import.meta.dirname}/tmp-bad-existing.json`;
+    writeFileSync(tmpPath, settingJson, "utf-8");
     try {
       await expect(loadSetting(tmpPath)).rejects.toThrow(KatazomeError);
     } finally {
-      await Bun.spawn(["rm", "-f", tmpPath]).exited;
+      rmSync(tmpPath, { force: true });
     }
   });
 
@@ -178,24 +172,24 @@ describe("loadSetting", () => {
     const settingJson = JSON.stringify({
       exclude: [".DS_Store", "*.local.*"],
     });
-    const tmpPath = `${import.meta.dir}/tmp-exclude.json`;
-    await Bun.write(tmpPath, settingJson);
+    const tmpPath = `${import.meta.dirname}/tmp-exclude.json`;
+    writeFileSync(tmpPath, settingJson, "utf-8");
     try {
       const setting = await loadSetting(tmpPath);
       expect(setting.exclude).toEqual([".DS_Store", "*.local.*"]);
     } finally {
-      await Bun.spawn(["rm", "-f", tmpPath]).exited;
+      rmSync(tmpPath, { force: true });
     }
   });
 
   test("throws when exclude is not an array", async () => {
     const settingJson = JSON.stringify({ exclude: ".DS_Store" });
-    const tmpPath = `${import.meta.dir}/tmp-bad-exclude.json`;
-    await Bun.write(tmpPath, settingJson);
+    const tmpPath = `${import.meta.dirname}/tmp-bad-exclude.json`;
+    writeFileSync(tmpPath, settingJson, "utf-8");
     try {
       await expect(loadSetting(tmpPath)).rejects.toThrow(KatazomeError);
     } finally {
-      await Bun.spawn(["rm", "-f", tmpPath]).exited;
+      rmSync(tmpPath, { force: true });
     }
   });
 
@@ -217,27 +211,27 @@ describe("loadSetting", () => {
         ],
       },
     });
-    const tmpPath = `${import.meta.dir}/tmp-root-imports.json`;
-    await Bun.write(tmpPath, settingJson);
+    const tmpPath = `${import.meta.dirname}/tmp-root-imports.json`;
+    writeFileSync(tmpPath, settingJson, "utf-8");
     try {
       const setting = await loadSetting(tmpPath);
       expect(setting.imports?.paths).toHaveLength(2);
       expect(setting.imports?.paths[0]).toEqual({ path: "./helpers.ts", as: "helpers" });
       expect(setting.imports?.paths[1]).toEqual({ path: "../shared/utils.ts", as: "myUtils" });
     } finally {
-      await Bun.spawn(["rm", "-f", tmpPath]).exited;
+      rmSync(tmpPath, { force: true });
     }
   });
 
   test("root imports with empty paths array", async () => {
     const settingJson = JSON.stringify({ imports: { paths: [] } });
-    const tmpPath = `${import.meta.dir}/tmp-root-imports-empty.json`;
-    await Bun.write(tmpPath, settingJson);
+    const tmpPath = `${import.meta.dirname}/tmp-root-imports-empty.json`;
+    writeFileSync(tmpPath, settingJson, "utf-8");
     try {
       const setting = await loadSetting(tmpPath);
       expect(setting.imports?.paths).toHaveLength(0);
     } finally {
-      await Bun.spawn(["rm", "-f", tmpPath]).exited;
+      rmSync(tmpPath, { force: true });
     }
   });
 
@@ -253,15 +247,15 @@ describe("loadSetting", () => {
         },
       ],
     });
-    const tmpPath = `${import.meta.dir}/tmp-file-imports-inherit-true.json`;
-    await Bun.write(tmpPath, settingJson);
+    const tmpPath = `${import.meta.dirname}/tmp-file-imports-inherit-true.json`;
+    writeFileSync(tmpPath, settingJson, "utf-8");
     try {
       const setting = await loadSetting(tmpPath);
       expect(setting.files[0]?.imports?.inherit).toBe(true);
       expect(setting.files[0]?.imports?.paths).toHaveLength(1);
       expect(setting.files[0]?.imports?.paths[0]).toEqual({ path: "./c-helpers.ts", as: "cHelpers" });
     } finally {
-      await Bun.spawn(["rm", "-f", tmpPath]).exited;
+      rmSync(tmpPath, { force: true });
     }
   });
 
@@ -274,13 +268,13 @@ describe("loadSetting", () => {
         },
       ],
     });
-    const tmpPath = `${import.meta.dir}/tmp-file-imports-inherit-default.json`;
-    await Bun.write(tmpPath, settingJson);
+    const tmpPath = `${import.meta.dirname}/tmp-file-imports-inherit-default.json`;
+    writeFileSync(tmpPath, settingJson, "utf-8");
     try {
       const setting = await loadSetting(tmpPath);
       expect(setting.files[0]?.imports?.inherit).toBe(true);
     } finally {
-      await Bun.spawn(["rm", "-f", tmpPath]).exited;
+      rmSync(tmpPath, { force: true });
     }
   });
 
@@ -296,13 +290,13 @@ describe("loadSetting", () => {
         },
       ],
     });
-    const tmpPath = `${import.meta.dir}/tmp-file-imports-inherit-false.json`;
-    await Bun.write(tmpPath, settingJson);
+    const tmpPath = `${import.meta.dirname}/tmp-file-imports-inherit-false.json`;
+    writeFileSync(tmpPath, settingJson, "utf-8");
     try {
       const setting = await loadSetting(tmpPath);
       expect(setting.files[0]?.imports?.inherit).toBe(false);
     } finally {
-      await Bun.spawn(["rm", "-f", tmpPath]).exited;
+      rmSync(tmpPath, { force: true });
     }
   });
 
@@ -310,13 +304,13 @@ describe("loadSetting", () => {
     const settingJson = JSON.stringify({
       files: [{ pattern: "*.c" }],
     });
-    const tmpPath = `${import.meta.dir}/tmp-file-imports-absent.json`;
-    await Bun.write(tmpPath, settingJson);
+    const tmpPath = `${import.meta.dirname}/tmp-file-imports-absent.json`;
+    writeFileSync(tmpPath, settingJson, "utf-8");
     try {
       const setting = await loadSetting(tmpPath);
       expect(setting.files[0]?.imports).toBeUndefined();
     } finally {
-      await Bun.spawn(["rm", "-f", tmpPath]).exited;
+      rmSync(tmpPath, { force: true });
     }
   });
 
@@ -324,12 +318,12 @@ describe("loadSetting", () => {
     const settingJson = JSON.stringify({
       imports: { paths: [{ path: "./helpers.ts", as: "ktzm" }] },
     });
-    const tmpPath = `${import.meta.dir}/tmp-imports-reserved-as.json`;
-    await Bun.write(tmpPath, settingJson);
+    const tmpPath = `${import.meta.dirname}/tmp-imports-reserved-as.json`;
+    writeFileSync(tmpPath, settingJson, "utf-8");
     try {
       await expect(loadSetting(tmpPath)).rejects.toThrow(KatazomeError);
     } finally {
-      await Bun.spawn(["rm", "-f", tmpPath]).exited;
+      rmSync(tmpPath, { force: true });
     }
   });
 
@@ -337,12 +331,12 @@ describe("loadSetting", () => {
     const settingJson = JSON.stringify({
       imports: { paths: [{ as: "helpers" }] },
     });
-    const tmpPath = `${import.meta.dir}/tmp-imports-no-path.json`;
-    await Bun.write(tmpPath, settingJson);
+    const tmpPath = `${import.meta.dirname}/tmp-imports-no-path.json`;
+    writeFileSync(tmpPath, settingJson, "utf-8");
     try {
       await expect(loadSetting(tmpPath)).rejects.toThrow(KatazomeError);
     } finally {
-      await Bun.spawn(["rm", "-f", tmpPath]).exited;
+      rmSync(tmpPath, { force: true });
     }
   });
 
@@ -350,12 +344,12 @@ describe("loadSetting", () => {
     const settingJson = JSON.stringify({
       imports: { paths: [{ path: "./helpers.ts" }] },
     });
-    const tmpPath = `${import.meta.dir}/tmp-imports-no-as.json`;
-    await Bun.write(tmpPath, settingJson);
+    const tmpPath = `${import.meta.dirname}/tmp-imports-no-as.json`;
+    writeFileSync(tmpPath, settingJson, "utf-8");
     try {
       await expect(loadSetting(tmpPath)).rejects.toThrow(KatazomeError);
     } finally {
-      await Bun.spawn(["rm", "-f", tmpPath]).exited;
+      rmSync(tmpPath, { force: true });
     }
   });
 
@@ -363,12 +357,12 @@ describe("loadSetting", () => {
     const settingJson = JSON.stringify({
       imports: [{ path: "./helpers.ts", as: "helpers" }],
     });
-    const tmpPath = `${import.meta.dir}/tmp-imports-array.json`;
-    await Bun.write(tmpPath, settingJson);
+    const tmpPath = `${import.meta.dirname}/tmp-imports-array.json`;
+    writeFileSync(tmpPath, settingJson, "utf-8");
     try {
       await expect(loadSetting(tmpPath)).rejects.toThrow(KatazomeError);
     } finally {
-      await Bun.spawn(["rm", "-f", tmpPath]).exited;
+      rmSync(tmpPath, { force: true });
     }
   });
 
@@ -405,49 +399,49 @@ describe("loadSetting", () => {
   // -------------------------------------------------------------------------
 
   test("warns on unknown key at root level", async () => {
-    const spy = spyOn(console, "warn");
+    const spy = vi.spyOn(console, "warn");
     const settingJson = JSON.stringify({ unknownKey: 123 });
-    const tmpPath = `${import.meta.dir}/tmp-unknown-root.json`;
-    await Bun.write(tmpPath, settingJson);
+    const tmpPath = `${import.meta.dirname}/tmp-unknown-root.json`;
+    writeFileSync(tmpPath, settingJson, "utf-8");
     try {
       await loadSetting(tmpPath);
       expect(spy).toHaveBeenCalledWith(expect.stringContaining('"unknownKey"'));
     } finally {
-      await Bun.spawn(["rm", "-f", tmpPath]).exited;
+      rmSync(tmpPath, { force: true });
       spy.mockRestore();
     }
   });
 
   test("warns on unknown key in tagDefinition", async () => {
-    const spy = spyOn(console, "warn");
+    const spy = vi.spyOn(console, "warn");
     const settingJson = JSON.stringify({
       tagDefinition: { typo: [], code: [{ start: "<%", end: "%>" }] },
     });
-    const tmpPath = `${import.meta.dir}/tmp-unknown-tagdef.json`;
-    await Bun.write(tmpPath, settingJson);
+    const tmpPath = `${import.meta.dirname}/tmp-unknown-tagdef.json`;
+    writeFileSync(tmpPath, settingJson, "utf-8");
     try {
       await loadSetting(tmpPath);
       expect(spy).toHaveBeenCalledWith(expect.stringContaining('"typo"'));
     } finally {
-      await Bun.spawn(["rm", "-f", tmpPath]).exited;
+      rmSync(tmpPath, { force: true });
       spy.mockRestore();
     }
   });
 
   test("warns on unknown key in file-pattern tagDefinition", async () => {
-    const spy = spyOn(console, "warn");
+    const spy = vi.spyOn(console, "warn");
     const settingJson = JSON.stringify({
       files: [
         { pattern: "*.c", tagDefinition: { inherrit: false, code: [{ start: "<%", end: "%>" }] } },
       ],
     });
-    const tmpPath = `${import.meta.dir}/tmp-unknown-file-tagdef.json`;
-    await Bun.write(tmpPath, settingJson);
+    const tmpPath = `${import.meta.dirname}/tmp-unknown-file-tagdef.json`;
+    writeFileSync(tmpPath, settingJson, "utf-8");
     try {
       await loadSetting(tmpPath);
       expect(spy).toHaveBeenCalledWith(expect.stringContaining('"inherrit"'));
     } finally {
-      await Bun.spawn(["rm", "-f", tmpPath]).exited;
+      rmSync(tmpPath, { force: true });
       spy.mockRestore();
     }
   });
@@ -462,8 +456,8 @@ describe("loadSetting", () => {
         { name: "propName", kind: "text", type: "string", message: "Property name?", default: "foo" },
       ],
     });
-    const tmpPath = `${import.meta.dir}/tmp-questions-text.json`;
-    await Bun.write(tmpPath, settingJson);
+    const tmpPath = `${import.meta.dirname}/tmp-questions-text.json`;
+    writeFileSync(tmpPath, settingJson, "utf-8");
     try {
       const setting = await loadSetting(tmpPath);
       expect(setting.questions).toHaveLength(1);
@@ -475,7 +469,7 @@ describe("loadSetting", () => {
         expect(q.default).toBe("foo");
       }
     } finally {
-      await Bun.spawn(["rm", "-f", tmpPath]).exited;
+      rmSync(tmpPath, { force: true });
     }
   });
 
@@ -494,8 +488,8 @@ describe("loadSetting", () => {
         },
       ],
     });
-    const tmpPath = `${import.meta.dir}/tmp-questions-select.json`;
-    await Bun.write(tmpPath, settingJson);
+    const tmpPath = `${import.meta.dirname}/tmp-questions-select.json`;
+    writeFileSync(tmpPath, settingJson, "utf-8");
     try {
       const setting = await loadSetting(tmpPath);
       const q = setting.questions![0]!;
@@ -506,7 +500,7 @@ describe("loadSetting", () => {
         expect(q.default).toBe(10);
       }
     } finally {
-      await Bun.spawn(["rm", "-f", tmpPath]).exited;
+      rmSync(tmpPath, { force: true });
     }
   });
 
@@ -517,12 +511,12 @@ describe("loadSetting", () => {
         { name: "foo", kind: "text", type: "string", message: "Second?" },
       ],
     });
-    const tmpPath = `${import.meta.dir}/tmp-questions-dup-name.json`;
-    await Bun.write(tmpPath, settingJson);
+    const tmpPath = `${import.meta.dirname}/tmp-questions-dup-name.json`;
+    writeFileSync(tmpPath, settingJson, "utf-8");
     try {
       await expect(loadSetting(tmpPath)).rejects.toThrow(KatazomeError);
     } finally {
-      await Bun.spawn(["rm", "-f", tmpPath]).exited;
+      rmSync(tmpPath, { force: true });
     }
   });
 
@@ -532,12 +526,12 @@ describe("loadSetting", () => {
         { name: "foo", kind: "text", type: "string", message: "Msg?", options: [] },
       ],
     });
-    const tmpPath = `${import.meta.dir}/tmp-questions-text-options.json`;
-    await Bun.write(tmpPath, settingJson);
+    const tmpPath = `${import.meta.dirname}/tmp-questions-text-options.json`;
+    writeFileSync(tmpPath, settingJson, "utf-8");
     try {
       await expect(loadSetting(tmpPath)).rejects.toThrow(KatazomeError);
     } finally {
-      await Bun.spawn(["rm", "-f", tmpPath]).exited;
+      rmSync(tmpPath, { force: true });
     }
   });
 
@@ -547,12 +541,12 @@ describe("loadSetting", () => {
         { name: "foo", kind: "select", type: "string", message: "Msg?", options: [{ label: "A", value: 1 }] },
       ],
     });
-    const tmpPath = `${import.meta.dir}/tmp-questions-select-type.json`;
-    await Bun.write(tmpPath, settingJson);
+    const tmpPath = `${import.meta.dirname}/tmp-questions-select-type.json`;
+    writeFileSync(tmpPath, settingJson, "utf-8");
     try {
       await expect(loadSetting(tmpPath)).rejects.toThrow(KatazomeError);
     } finally {
-      await Bun.spawn(["rm", "-f", tmpPath]).exited;
+      rmSync(tmpPath, { force: true });
     }
   });
 
@@ -562,24 +556,24 @@ describe("loadSetting", () => {
         { name: "foo", kind: "select", message: "Msg?", options: [] },
       ],
     });
-    const tmpPath = `${import.meta.dir}/tmp-questions-empty-options.json`;
-    await Bun.write(tmpPath, settingJson);
+    const tmpPath = `${import.meta.dirname}/tmp-questions-empty-options.json`;
+    writeFileSync(tmpPath, settingJson, "utf-8");
     try {
       await expect(loadSetting(tmpPath)).rejects.toThrow(KatazomeError);
     } finally {
-      await Bun.spawn(["rm", "-f", tmpPath]).exited;
+      rmSync(tmpPath, { force: true });
     }
   });
 
   test("questions is undefined when omitted", async () => {
     const settingJson = JSON.stringify({ files: [] });
-    const tmpPath = `${import.meta.dir}/tmp-questions-absent.json`;
-    await Bun.write(tmpPath, settingJson);
+    const tmpPath = `${import.meta.dirname}/tmp-questions-absent.json`;
+    writeFileSync(tmpPath, settingJson, "utf-8");
     try {
       const setting = await loadSetting(tmpPath);
       expect(setting.questions).toBeUndefined();
     } finally {
-      await Bun.spawn(["rm", "-f", tmpPath]).exited;
+      rmSync(tmpPath, { force: true });
     }
   });
 });

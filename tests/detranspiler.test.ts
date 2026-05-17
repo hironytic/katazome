@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { detranspile } from "../src/core/detranspiler.ts";
 import { tokenize } from "../src/core/tokenizer.ts";
 import { transpileTokens } from "../src/core/transpiler.ts";
@@ -19,7 +19,7 @@ const cTagDef: TagDefinition = {
   ],
 };
 
-const RUNTIME = "./ktzm-runtime.ts";
+const RUNTIME = "./ktzm-runtime.mts";
 
 /**
  * Performs a round-trip: template → tokens → transpilate → detranspilate.
@@ -95,7 +95,7 @@ describe("detranspile", () => {
   test("detranspiles code tag marking directly", () => {
     // The literal "\n" after the code tag becomes ktzm.out("\n") in transpilate.
     const transpilate = `/*ktzm:appended{*/
-import { runKatazome } from "./ktzm-runtime.ts";
+import { runKatazome } from "./ktzm-runtime.mts";
 runKatazome(async (ktzm) => {
 /*}ktzm*/
 
@@ -113,7 +113,7 @@ ktzm.out("hello\\n");
 
   test("detranspiles value tag with index 1", () => {
     const transpilate = `/*ktzm:appended{*/
-import { runKatazome } from "./ktzm-runtime.ts";
+import { runKatazome } from "./ktzm-runtime.mts";
 runKatazome(async (ktzm) => {
 /*}ktzm*/
 
@@ -131,7 +131,7 @@ runKatazome(async (ktzm) => {
     // Trimmed whitespace is stored verbatim inside ktzm:trimmed comments.
     // Template: "Hello    \n/*{%- for ... -%}*/\nline\n/*{%- } -%}*/\n!"
     // "    \n" is trimmed from after "Hello", "\n" from before/after "line".
-    const transpilate = "/*ktzm:appended{*/\nimport { runKatazome } from \"./ktzm-runtime.ts\";\nrunKatazome(async (ktzm) => {\n/*}ktzm*/\n\n" +
+    const transpilate = "/*ktzm:appended{*/\nimport { runKatazome } from \"./ktzm-runtime.mts\";\nrunKatazome(async (ktzm) => {\n/*}ktzm*/\n\n" +
       "ktzm.out(\"Hello\");\n" +
       "/*ktzm:trimmed{*//*    \n*//*}ktzm*/\n" +
       "/*ktzm:code(1){*/ for (const x of items) { /*}ktzm*/\n" +

@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Katazome is a CLI tool (command: `ktzm`) built with Bun that generates programming scaffolds from user-defined templates.
+Katazome is a CLI tool (command: `ktzm`) built with Node.js that generates programming scaffolds from user-defined templates.
 
 ### Key Features
 
@@ -54,15 +54,15 @@ ktzm generate [options] <template> <output>
 |---|---|
 | `<template>` | Template file or directory |
 | `<output>` | Output file or directory |
-| `--setting <file>` | Path to the setting file (default: `ktzm-setting.{json,json5,yaml,toml}` in the same directory as the template) |
-| `--input <file>` | Input data file (JSON, JSON5, YAML, or TOML) |
+| `--setting <file>` | Path to the setting file (default: `ktzm-setting.{json,json5,yaml}` in the same directory as the template) |
+| `--input <file>` | Input data file (JSON, JSON5, or YAML) |
 | `--answer <name=value>` | Pre-supply an answer to a question; repeatable |
 
 When `<template>` is a directory, `<output>` is treated as a directory target.
 
 ### transpile
 
-Converts a template to a TypeScript transpilate for inspection and debugging. Also generates a runtime file (`ktzm-runtime.ts`) and a session file (`ktzm-session.json`) alongside the transpilate.
+Converts a template to a TypeScript transpilate for inspection and debugging. Also generates a runtime file (`ktzm-runtime.mts`) and a session file (`ktzm-session.json`) alongside the transpilate.
 
 ```
 ktzm transpile [options] <template> [output]
@@ -71,15 +71,15 @@ ktzm transpile [options] <template> [output]
 | Argument / Option | Description |
 |---|---|
 | `<template>` | Template file or directory (`[output]` is required when this is a directory) |
-| `[output]` | Output transpilate file or directory (default: `<template>.ts`) |
+| `[output]` | Output transpilate file or directory (default: `<template>.mts`) |
 | `--setting <file>` | Path to the setting file |
 | `--input <file>` | Input data file |
 | `--answer <name=value>` | Pre-supply an answer to a question; repeatable |
-| `--runtime <file>` | Output path for the runtime file (default: `ktzm-runtime.ts` next to the transpilate) |
+| `--runtime <file>` | Output path for the runtime file (default: `ktzm-runtime.mts` next to the transpilate) |
 | `--session <file>` | Output path for the session file (default: `ktzm-session.json` next to the transpilate) |
 | `--force` | Skip the confirmation prompt when the output already exists |
 
-The generated transpilate can be run directly with `bun run <transpilate>`. Set the `KTZM_OUTPUT_FILE_PATH` environment variable to specify the initial output file path when running manually.
+The generated transpilate can be run directly with `node <transpilate>`. Set the `KTZM_OUTPUT_FILE_PATH` environment variable to specify the initial output file path when running manually.
 
 ### detranspile
 
@@ -112,9 +112,11 @@ Inside a template, the `ktzm` object is available with the following members:
 
 ## Key Design Decisions
 
-- **`undefined` over `null`**: use `undefined` to represent the absence of a value. `null` is only acceptable where the bun's API or the third-party libraries explicitly require it. Values received as `null` from external sources should be converted with `?? undefined` before use in internal code.
+- **`undefined` over `null`**: use `undefined` to represent the absence of a value. `null` is only acceptable where the third-party libraries explicitly require it. Values received as `null` from external sources should be converted with `?? undefined` before use in internal code.
 
-- **`transpile` as a debugging aid for `generate`**: The primary command is `generate` (transpile + render in one step). When `generate` fails at render time, users need to inspect the intermediate transpilate to debug code tags and value tags they wrote. `transpile` serves this purpose: it produces the same transpilate that `generate` uses internally, so users can run it directly with `bun run` to reproduce and investigate failures. `detranspile` then helps them apply any fixes made in the transpilate back to the original template. This means **the transpilate produced by `transpile` and the transpilate used internally by `generate` must behave as consistently as possible**. Designs that cause `generate`'s internal execution to diverge from a plain `bun run` of the transpilate undermine the debugging workflow.
+- **Helper files must be ES modules**: Helper TypeScript files loaded via the `imports` setting must be recognizable as ES modules by Node.js. Use `.mts` or `.mjs` extension, or place a `package.json` containing `{ "type": "module" }` in the helper's directory or an ancestor. If neither is done, Node.js falls back to CommonJS mode: named exports become inaccessible via `import * as helpers from "..."`, breaking any `helpers.someFunction()` calls in templates, and a `MODULE_TYPELESS_PACKAGE_JSON` warning is emitted.
+
+- **`transpile` as a debugging aid for `generate`**: The primary command is `generate` (transpile + render in one step). When `generate` fails at render time, users need to inspect the intermediate transpilate to debug code tags and value tags they wrote. `transpile` serves this purpose: it produces the same transpilate that `generate` uses internally, so users can run it directly with `node` to reproduce and investigate failures. `detranspile` then helps them apply any fixes made in the transpilate back to the original template. This means **the transpilate produced by `transpile` and the transpilate used internally by `generate` must behave as consistently as possible**. Designs that cause `generate`'s internal execution to diverge from a plain `node` run of the transpilate undermine the debugging workflow.
 
 ---
 
@@ -123,13 +125,13 @@ Inside a template, the `ktzm` object is available with the following members:
 ### Tests
 
 ```bash
-bun test
+npm test
 ```
 
 ### Type-checking
 
 ```bash
-bun run typecheck
+npm run typecheck
 ```
 
 ---
@@ -138,7 +140,7 @@ bun run typecheck
 
 ### Input data normalization
 
-The main process parses `--input` files (JSON, JSON5, YAML, or TOML) and re-serializes the result as **plain JSON** to a temp file. The runtime (`ktzm-runtime.ts`) only reads plain JSON. This means all format handling is confined to the main process; the runtime has no parser dependency.
+The main process parses `--input` files (JSON, JSON5, or YAML) and re-serializes the result as **plain JSON** to a temp file. The runtime (`ktzm-runtime.mts`) only reads plain JSON. This means all format handling is confined to the main process; the runtime has no parser dependency.
 
 ### tagIndex and setting file compatibility
 

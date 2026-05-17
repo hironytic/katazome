@@ -2,6 +2,7 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSyn
 import { dirname, join, resolve, sep } from "node:path";
 import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
+import { Worker } from "node:worker_threads";
 import { generateRuntimeContent } from "../runtime/content.ts";
 import { KatazomeError } from "../errors.ts";
 import { askExistingFileAction } from "../commands/utils.ts";
@@ -61,8 +62,8 @@ export async function render(
   mkdirSync(tmpDir, { recursive: true });
 
   try {
-    const runtimePath = join(tmpDir, "ktzm-runtime.ts");
-    const transpilatePath = join(tmpDir, "transpilate.ts");
+    const runtimePath = join(tmpDir, "ktzm-runtime.mts");
+    const transpilatePath = join(tmpDir, "transpilate.mts");
 
     const isPrompt = output.kind === "directory" && output.existingFileBehavior === "prompt";
 
@@ -98,18 +99,18 @@ export async function render(
           reject(new KatazomeError(msg));
         }
       };
-      worker.addEventListener("close", (event) => {
+      worker.on("exit", (code) => {
         if (!settled) {
           settled = true;
-          if (event.code === 0) {
+          if (code === 0) {
             resolve();
           } else {
-            fail(`Template execution failed with exit code ${event.code}.`);
+            fail(`Template execution failed with exit code ${code}.`);
           }
         }
       });
-      worker.addEventListener("error", (event) => {
-        fail(`Template execution failed:\n${event.message}`);
+      worker.on("error", (err: Error) => {
+        fail(`Template execution failed:\n${err.message}`);
       });
     });
 

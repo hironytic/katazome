@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { tokenize } from "../src/core/tokenizer.ts";
 import { KatazomeError } from "../src/errors.ts";
 import type { TagDefinition, LiteralToken, TagToken } from "../src/types.ts";

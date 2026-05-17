@@ -5,13 +5,13 @@ import { KatazomeError } from "../errors.ts";
 import { askSelect } from "../interactive/prompts.ts";
 import type { ExistingFileBehavior, FilePatternConfig, ImportEntry, TagDefinition, Setting } from "../types.ts";
 
-const SETTING_EXTS = ["json", "json5", "yaml", "toml"] as const;
+const SETTING_EXTS = ["json", "json5", "yaml"] as const;
 const SETTING_BASE = "ktzm-setting";
 
 /**
  * Resolves the path to the setting file.
  * If settingPath is given, returns it as-is.
- * Otherwise searches for ktzm-setting.{json,json5,yaml,toml} in the same
+ * Otherwise searches for ktzm-setting.{json,json5,yaml} in the same
  * directory as inputPath (treating inputPath as a file) or in inputPath itself
  * (if it is a directory).
  */
@@ -32,7 +32,7 @@ export function resolveSettingPath(
   }
 
   throw new KatazomeError(
-    `Setting file not found. Looked for "${SETTING_BASE}.{json,json5,yaml,toml}" in "${dir}".`
+    `Setting file not found. Looked for "${SETTING_BASE}.{json,json5,yaml}" in "${dir}".`
   );
 }
 
