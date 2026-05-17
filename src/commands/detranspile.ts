@@ -60,7 +60,7 @@ export async function runDetranspile(options: DetranspileOptions): Promise<void>
       // Directory mode
       transpilateAbsPath = join(
         session.transpilatePath,
-        `${sessionFile.relativePath}.ts`
+        `${sessionFile.relativePath}.mts`
       );
       templateOutAbsPath = join(outputAbs, sessionFile.relativePath);
       displayName = sessionFile.relativePath;
@@ -76,10 +76,10 @@ async function detranspileFile(
   setting: ReturnType<typeof loadSetting> extends Promise<infer T> ? T : never,
   displayName: string
 ): Promise<void> {
-  // The original template filename is the transpilate name without ".ts".
-  // e.g. "main.c.ts" → original filename is "main.c"
-  const originalFilename = displayName.endsWith(".ts")
-    ? displayName.slice(0, -3)
+  // The original template filename is the transpilate name without ".mts".
+  // e.g. "main.c.mts" → original filename is "main.c"
+  const originalFilename = displayName.endsWith(".mts")
+    ? displayName.slice(0, -4)
     : displayName;
 
   const tagDef = getTagDefForFile(setting, originalFilename);
