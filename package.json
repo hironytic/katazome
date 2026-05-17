@@ -10,16 +10,18 @@
   },
   "type": "module",
   "bin": {
-    "ktzm": "./src/cli.ts"
+    "ktzm": "./dist/cli.mjs"
   },
   "publishConfig": {
     "access": "public"
   },
   "files": [
-    "src/"
+    "dist/"
   ],
   "scripts": {
-    "start": "node src/cli.ts",
+    "build": "tsdown",
+    "dev": "node src/cli.ts",
+    "preview": "node dist/cli.mjs",
     "test": "vitest run",
     "lint": "eslint src",
     "typecheck": "tsc --noEmit"
@@ -34,16 +36,16 @@
       "onFail": "warn"
     }
   },
-  "dependencies": {
-    "commander": "^12.1.0",
-    "json5": "^2.2.3",
-    "yaml": "^2.8.4"
-  },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/node": "^24.0.0",
+    "commander": "^12.1.0",
     "eslint": "^10.3.0",
+    "json5": "^2.2.3",
+    "tsdown": "^0.22.0",
+    "typescript": "^6.0.3",
     "typescript-eslint": "^8.59.2",
-    "vitest": "^4.1.5"
+    "vitest": "^4.1.5",
+    "yaml": "^2.8.4"
   }
 }
