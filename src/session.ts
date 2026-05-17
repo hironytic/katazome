@@ -1,4 +1,4 @@
-import { writeFileSync, existsSync, mkdirSync } from "node:fs";
+import { writeFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { KatazomeError } from "./errors.ts";
 import { CLI_VERSION } from "./version.ts";
@@ -28,7 +28,7 @@ export async function readSession(sessionPath: string): Promise<TranspileSession
 
   let content: string;
   try {
-    content = await Bun.file(absPath).text();
+    content = readFileSync(absPath, "utf-8");
   } catch {
     throw new KatazomeError(`Cannot read session file: "${absPath}"`);
   }

@@ -1,5 +1,5 @@
 import { resolve, join, basename } from "node:path";
-import { writeFileSync, statSync, existsSync } from "node:fs";
+import { writeFileSync, statSync, existsSync, readFileSync } from "node:fs";
 import { loadSetting } from "../config/loader.ts";
 import { detranspile } from "../core/detranspiler.ts";
 import {
@@ -86,7 +86,7 @@ async function detranspileFile(
 
   let transpilateContent: string;
   try {
-    transpilateContent = await Bun.file(transpilatePath).text();
+    transpilateContent = readFileSync(transpilatePath, "utf-8");
   } catch {
     throw new KatazomeError(`Cannot read transpiled file: "${transpilatePath}"`);
   }

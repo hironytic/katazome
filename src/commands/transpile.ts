@@ -1,5 +1,5 @@
 import { resolve, dirname, join, basename } from "node:path";
-import { writeFileSync, statSync, existsSync, rmSync } from "node:fs";
+import { writeFileSync, statSync, existsSync, rmSync, readFileSync } from "node:fs";
 import { loadSetting } from "../config/loader.ts";
 import { loadInput } from "../input/loader.ts";
 import { tokenize } from "../core/tokenizer.ts";
@@ -75,10 +75,10 @@ export async function runTranspile(options: TranspileOptions): Promise<void> {
 
     const answerData = await resolveAnswers(setting.questions ?? [], cliAnswers, isInteractive);
 
-    // Determine runtime path: --runtime or <outputDir>/ktzm-runtime.ts
+    // Determine runtime path: --runtime or <outputDir>/ktzm-runtime.mts
     const runtimePath = options.runtime
       ? resolve(options.runtime)
-      : join(outputAbs, "ktzm-runtime.ts");
+      : join(outputAbs, "ktzm-runtime.mts");
 
     ensureDir(runtimePath);
     writeFileSync(runtimePath, generateRuntimeContent(inputData, answerData, { kind: "stdout" }), "utf-8");
@@ -87,7 +87,7 @@ export async function runTranspile(options: TranspileOptions): Promise<void> {
     for (const file of files) {
       if (file.absolutePath === settingAbs) continue;
       if (isExcluded(setting, basename(file.absolutePath))) continue;
-      const outRelPath = `${file.relativePath}.ts`;
+      const outRelPath = `${file.relativePath}.mts`;
       const outAbsPath = join(outputAbs, outRelPath);
       if (outAbsPath === settingAbs) {
         throw new KatazomeError(
@@ -134,11 +134,11 @@ export async function runTranspile(options: TranspileOptions): Promise<void> {
     let outputDirAbs: string;
     if (isOutputDir) {
       outputDirAbs = resolve(options.outputPath!);
-      outputFileAbs = join(outputDirAbs, `${basename(templateAbs)}.ts`);
+      outputFileAbs = join(outputDirAbs, `${basename(templateAbs)}.mts`);
     } else {
       outputFileAbs = options.outputPath
         ? resolve(options.outputPath)
-        : `${templateAbs}.ts`;
+        : `${templateAbs}.mts`;
       outputDirAbs = dirname(outputFileAbs);
     }
 
@@ -169,10 +169,10 @@ export async function runTranspile(options: TranspileOptions): Promise<void> {
 
     const answerData = await resolveAnswers(setting.questions ?? [], cliAnswers, isInteractive);
 
-    // Determine runtime path: --runtime or <outputDir>/ktzm-runtime.ts
+    // Determine runtime path: --runtime or <outputDir>/ktzm-runtime.mts
     const runtimePath = options.runtime
       ? resolve(options.runtime)
-      : join(outputDirAbs, "ktzm-runtime.ts");
+      : join(outputDirAbs, "ktzm-runtime.mts");
 
     ensureDir(runtimePath);
     writeFileSync(runtimePath, generateRuntimeContent(inputData, answerData, { kind: "stdout" }), "utf-8");
@@ -212,7 +212,7 @@ async function transpileFile(
 
   let templateContent: string;
   try {
-    templateContent = await Bun.file(templatePath).text();
+    templateContent = readFileSync(templatePath, "utf-8");
   } catch {
     throw new KatazomeError(`Cannot read template file: "${templatePath}"`);
   }

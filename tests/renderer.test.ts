@@ -1,9 +1,9 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { render } from "../src/core/renderer.ts";
 import { tokenize } from "../src/core/tokenizer.ts";
 import { transpileTokens } from "../src/core/transpiler.ts";
 import type { TagDefinition } from "../src/types.ts";
-import { mkdirSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
@@ -22,7 +22,7 @@ const cTagDef: TagDefinition = {
 };
 
 function makeTranspilate(template: string): string {
-  return transpileTokens(tokenize(template, cTagDef), "./ktzm-runtime.ts");
+  return transpileTokens(tokenize(template, cTagDef), "./ktzm-runtime.mts");
 }
 
 function withTempDir(fn: (dir: string) => Promise<void>): Promise<void> {
@@ -37,7 +37,7 @@ describe("render", () => {
       const outputPath = join(dir, "output.txt");
       const transpilate = makeTranspilate("hello world\n");
       await render(transpilate, {}, {}, { kind: "file", outputFilePath: outputPath, initialRelativePath: "output.txt", existingFileBehavior: "overwrite", displayName: "output.txt" });
-      const content = await Bun.file(outputPath).text();
+      const content = readFileSync(outputPath, "utf-8");
       expect(content).toBe("hello world\n");
     });
   });
@@ -48,7 +48,7 @@ describe("render", () => {
       const template = "/*{% const name = ktzm.input.name; %}*/Hello _V_name_!";
       const transpilate = makeTranspilate(template);
       await render(transpilate, { name: "World" }, {}, { kind: "file", outputFilePath: outputPath, initialRelativePath: "output.txt", existingFileBehavior: "overwrite", displayName: "output.txt" });
-      const content = await Bun.file(outputPath).text();
+      const content = readFileSync(outputPath, "utf-8");
       expect(content).toBe("Hello World!");
     });
   });
@@ -60,7 +60,7 @@ describe("render", () => {
       const template = "/*{%- for (const item of ktzm.input.items) { -%}*/\n_V_item_\n/*{%- } -%}*/";
       const transpilate = makeTranspilate(template);
       await render(transpilate, { items: ["a", "b", "c"] }, {}, { kind: "file", outputFilePath: outputPath, initialRelativePath: "output.txt", existingFileBehavior: "overwrite", displayName: "output.txt" });
-      const content = await Bun.file(outputPath).text();
+      const content = readFileSync(outputPath, "utf-8");
       // Each item is output without surrounding newlines because of trim:"both"
       expect(content).toBe("abc");
     });
@@ -73,7 +73,7 @@ describe("render", () => {
       const template = "/*{% for (const item of ktzm.input.items) { %}*/_V_item_\n/*{% } %}*/";
       const transpilate = makeTranspilate(template);
       await render(transpilate, { items: ["a", "b", "c"] }, {}, { kind: "file", outputFilePath: outputPath, initialRelativePath: "output.txt", existingFileBehavior: "overwrite", displayName: "output.txt" });
-      const content = await Bun.file(outputPath).text();
+      const content = readFileSync(outputPath, "utf-8");
       expect(content).toBe("a\nb\nc\n");
     });
   });
@@ -83,11 +83,8 @@ describe("render", () => {
       const outputPath = join(dir, "output.txt");
       const transpilate = makeTranspilate("");
       await render(transpilate, {}, {}, { kind: "file", outputFilePath: outputPath, initialRelativePath: "output.txt", existingFileBehavior: "overwrite", displayName: "output.txt" });
-      // File should exist and be empty
-      const file = Bun.file(outputPath);
-      const exists = await file.exists();
-      expect(exists).toBe(true);
-      const content = await file.text();
+      expect(existsSync(outputPath)).toBe(true);
+      const content = readFileSync(outputPath, "utf-8");
       expect(content).toBe("");
     });
   });
@@ -98,7 +95,7 @@ describe("render", () => {
       // A transpilate that throws at runtime
       const badTranspilate = `
 /*ktzm:appended{*/
-import { runKatazome } from "./ktzm-runtime.ts";
+import { runKatazome } from "./ktzm-runtime.mts";
 runKatazome(async (ktzm) => {
 /*}ktzm*/
 

@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { transpileTokens, escapeString } from "../src/core/transpiler.ts";
 import { tokenize } from "../src/core/tokenizer.ts";
 import type { TagDefinition } from "../src/types.ts";
@@ -18,7 +18,7 @@ const cTagDef: TagDefinition = {
   ],
 };
 
-const RUNTIME = "./ktzm-runtime.ts";
+const RUNTIME = "./ktzm-runtime.mts";
 
 function transpile(template: string): string {
   return transpileTokens(tokenize(template, cTagDef), RUNTIME);

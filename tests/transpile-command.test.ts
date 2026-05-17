@@ -1,7 +1,7 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { runTranspile } from "../src/commands/transpile.ts";
 import { KatazomeError } from "../src/errors.ts";
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
@@ -34,7 +34,7 @@ describe("runTranspile without --setting", () => {
 
       await runTranspile({ templatePath, force: true });
 
-      expect(existsSync(join(dir, "template.txt.ts"))).toBe(true);
+      expect(existsSync(join(dir, "template.txt.mts"))).toBe(true);
     });
   });
 
@@ -62,8 +62,8 @@ describe("runTranspile setting file handling", () => {
 
       // Setting file is not copied to the output directory
       expect(existsSync(join(outputDir, "ktzm-setting.json"))).toBe(false);
-      // Template is transpiled with .ts extension
-      expect(existsSync(join(outputDir, "hello.txt.ts"))).toBe(true);
+      // Template is transpiled with .mts extension
+      expect(existsSync(join(outputDir, "hello.txt.mts"))).toBe(true);
     });
   });
 
@@ -104,8 +104,8 @@ describe("runTranspile without --input", () => {
 
       await runTranspile({ setting: settingPath, templatePath, force: true });
 
-      expect(existsSync(join(dir, "template.txt.ts"))).toBe(true);
-      expect(existsSync(join(dir, "ktzm-runtime.ts"))).toBe(true);
+      expect(existsSync(join(dir, "template.txt.mts"))).toBe(true);
+      expect(existsSync(join(dir, "ktzm-runtime.mts"))).toBe(true);
     });
   });
 
@@ -119,7 +119,7 @@ describe("runTranspile without --input", () => {
 
       await runTranspile({ setting: settingPath, templatePath, force: true });
 
-      const runtimeContent = await Bun.file(join(dir, "ktzm-runtime.ts")).text();
+      const runtimeContent = readFileSync(join(dir, "ktzm-runtime.mts"), "utf-8");
       expect(runtimeContent).toContain("const inputData: unknown = {}");
     });
   });
@@ -130,7 +130,7 @@ describe("runTranspile existing output handling", () => {
     await withTempDir(async (dir) => {
       const settingPath = join(dir, "setting.json");
       const templatePath = join(dir, "template.txt");
-      const outputPath = join(dir, "template.txt.ts");
+      const outputPath = join(dir, "template.txt.mts");
 
       writeFileSync(settingPath, settingJson, "utf-8");
       writeFileSync(templatePath, "hello\n", "utf-8");
@@ -138,7 +138,7 @@ describe("runTranspile existing output handling", () => {
 
       await runTranspile({ setting: settingPath, templatePath, force: true });
 
-      const content = await Bun.file(outputPath).text();
+      const content = readFileSync(outputPath, "utf-8");
       expect(content).not.toBe("old transpilate\n");
     });
   });
@@ -153,12 +153,12 @@ describe("runTranspile existing output handling", () => {
       writeFileSync(join(inputDir, "ktzm-setting.json"), settingJson, "utf-8");
       writeFileSync(join(inputDir, "hello.txt"), "hello\n", "utf-8");
       // Put a stale file in the output directory that should be removed
-      writeFileSync(join(outputDir, "stale.txt.ts"), "stale\n", "utf-8");
+      writeFileSync(join(outputDir, "stale.txt.mts"), "stale\n", "utf-8");
 
       await runTranspile({ templatePath: inputDir, outputPath: outputDir, force: true });
 
-      expect(existsSync(join(outputDir, "hello.txt.ts"))).toBe(true);
-      expect(existsSync(join(outputDir, "stale.txt.ts"))).toBe(false);
+      expect(existsSync(join(outputDir, "hello.txt.mts"))).toBe(true);
+      expect(existsSync(join(outputDir, "stale.txt.mts"))).toBe(false);
     });
   });
 });
@@ -185,7 +185,7 @@ describe("runTranspile imports", () => {
 
       await runTranspile({ templatePath: join(dir, "template.txt"), force: true });
 
-      const transpilate = await Bun.file(join(dir, "template.txt.ts")).text();
+      const transpilate = readFileSync(join(dir, "template.txt.mts"), "utf-8");
       expect(transpilate).toContain(`import * as helpers from "${join(dir, "helpers.ts")}"`);
     });
   });
@@ -210,7 +210,7 @@ describe("runTranspile error context in directory mode", () => {
 });
 
 describe("runTranspile output directory mode (file input)", () => {
-  test("trailing slash on output path treats it as directory (creates basename.ts)", async () => {
+  test("trailing slash on output path treats it as directory (creates basename.mts)", async () => {
     await withTempDir(async (dir) => {
       const templatePath = join(dir, "hello.txt");
       const outputDir = join(dir, "out");
@@ -220,8 +220,8 @@ describe("runTranspile output directory mode (file input)", () => {
 
       await runTranspile({ templatePath, outputPath: outputDir + "/", force: true });
 
-      expect(existsSync(join(outputDir, "hello.txt.ts"))).toBe(true);
-      expect(existsSync(join(outputDir, "ktzm-runtime.ts"))).toBe(true);
+      expect(existsSync(join(outputDir, "hello.txt.mts"))).toBe(true);
+      expect(existsSync(join(outputDir, "ktzm-runtime.mts"))).toBe(true);
       expect(existsSync(join(outputDir, "ktzm-session.json"))).toBe(true);
     });
   });
@@ -237,23 +237,23 @@ describe("runTranspile output directory mode (file input)", () => {
 
       await runTranspile({ templatePath, outputPath: outputDir, force: true });
 
-      expect(existsSync(join(outputDir, "hello.txt.ts"))).toBe(true);
+      expect(existsSync(join(outputDir, "hello.txt.mts"))).toBe(true);
     });
   });
 
-  test("--force overwrites existing output .ts file in directory mode without prompting", async () => {
+  test("--force overwrites existing output .mts file in directory mode without prompting", async () => {
     await withTempDir(async (dir) => {
       const templatePath = join(dir, "hello.txt");
       const outputDir = join(dir, "out");
       mkdirSync(outputDir, { recursive: true });
-      writeFileSync(join(outputDir, "hello.txt.ts"), "old content\n", "utf-8");
+      writeFileSync(join(outputDir, "hello.txt.mts"), "old content\n", "utf-8");
 
       writeFileSync(join(dir, "ktzm-setting.json"), settingJson, "utf-8");
       writeFileSync(templatePath, "hello\n", "utf-8");
 
       await runTranspile({ templatePath, outputPath: outputDir, force: true });
 
-      expect(await Bun.file(join(outputDir, "hello.txt.ts")).text()).not.toBe("old content\n");
+      expect(readFileSync(join(outputDir, "hello.txt.mts"), "utf-8")).not.toBe("old content\n");
     });
   });
 });
@@ -273,9 +273,9 @@ describe("runTranspile exclude", () => {
 
       await runTranspile({ templatePath: inputDir, outputPath: outputDir, force: true });
 
-      expect(existsSync(join(outputDir, "hello.txt.ts"))).toBe(true);
-      expect(existsSync(join(outputDir, ".DS_Store.ts"))).toBe(false);
-      expect(existsSync(join(outputDir, "config.local.txt.ts"))).toBe(false);
+      expect(existsSync(join(outputDir, "hello.txt.mts"))).toBe(true);
+      expect(existsSync(join(outputDir, ".DS_Store.mts"))).toBe(false);
+      expect(existsSync(join(outputDir, "config.local.txt.mts"))).toBe(false);
     });
   });
 });
