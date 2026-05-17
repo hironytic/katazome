@@ -122,10 +122,34 @@ Inside a template, the `ktzm` object is available with the following members:
 
 ## Running the Project
 
+### Build
+
+```bash
+npm run build
+```
+
+### Development (run from source without building)
+
+```bash
+npm run dev -- <args>
+```
+
+### Preview (run the built bundle)
+
+```bash
+npm run preview -- <args>
+```
+
 ### Tests
 
 ```bash
 npm test
+```
+
+### Lint
+
+```bash
+npm run lint
 ```
 
 ### Type-checking
