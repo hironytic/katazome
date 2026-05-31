@@ -18,8 +18,7 @@ export function toPascalCase(input: string): string {
 }
 
 export function toCamelCase(input: string): string {
-  const words = toWords(input);
-  return words
+  return toWords(input)
     .map((word, i) =>
       i === 0 ? word : word.charAt(0).toUpperCase() + word.slice(1),
     )
