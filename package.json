@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "packageManager": "npm@11.12.1",
   "description": "A CLI tool for generating source files from templates",
+  "homepage": "https://github.com/hironytic/katazome",
   "license": "MIT",
   "repository": {
     "type": "git",
