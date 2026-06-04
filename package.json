@@ -40,12 +40,12 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/node": "^24.0.0",
-    "commander": "^12.1.0",
+    "commander": "^14.0.3",
     "eslint": "^10.3.0",
     "json5": "^2.2.3",
     "tsdown": "^0.22.0",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.59.2",
+    "typescript-eslint": "^8.60.0",
     "vitest": "^4.1.5",
     "yaml": "^2.8.4"
   }
