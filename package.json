@@ -11,7 +11,7 @@
   },
   "type": "module",
   "bin": {
-    "ktzm": "./dist/cli.mjs"
+    "ktzm": "dist/cli.mjs"
   },
   "publishConfig": {
     "access": "public"
